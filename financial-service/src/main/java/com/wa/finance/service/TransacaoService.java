@@ -6,6 +6,7 @@ import com.wa.finance.domain.Usuario;
 import com.wa.finance.dto.TransacaoRequestDTO;
 import com.wa.finance.repository.CategoriaRepository;
 import com.wa.finance.repository.TransacaoRepository;
+import com.wa.finance.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,26 +17,32 @@ public class TransacaoService {
 
     private final TransacaoRepository transacaoRepository;
     private final CategoriaRepository categoriaRepository;
-    private final UsuarioService usuarioService;
+    private final UsuarioRepository usuarioRepository;
 
     @Transactional
-    public Transacao registrarTransacao(TransacaoRequestDTO dto) {
-        Usuario usuario = usuarioService.buscarOuCriarUsuarioPorTelefone(dto.telefone());
+    public Transacao processarTransacaoDaFila(TransacaoRequestDTO dto) {
+
+        Usuario usuario = usuarioRepository.findByTelefone(dto.telefone())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado para o telefone: " + dto.telefone()));
 
         Categoria categoria = categoriaRepository
-                .findByNomeIgnoreCaseAndUsuarioIdAndAtivaTrue(dto.categoriaNome(), usuario.getId())
-                .orElseGet(() -> categoriaRepository
-                        .findByNomeIgnoreCaseAndUsuarioIdAndAtivaTrue("Outros", usuario.getId())
-                        .orElseThrow(() -> new RuntimeException("Categoria 'Outros' não encontrada")));
+                .findByNomeIgnoreCaseAndUsuarioId(dto.categoriaNome(), usuario.getId())
+                .orElseGet(() -> {
+                    Categoria novaCategoria = new Categoria();
+                    novaCategoria.setNome(dto.categoriaNome());
+                    novaCategoria.setAtiva(true);
+                    novaCategoria.setUsuario(usuario);
 
-        Transacao novaTransacao = Transacao.builder()
-                .valor(dto.valor())
-                .descricao(dto.descricao())
-                .usuario(usuario)
-                .categoria(categoria)
-                .deletado(false)
-                .build();
+                    return categoriaRepository.save(novaCategoria);
+                });
 
-        return transacaoRepository.save(novaTransacao);
+        Transacao transacao = new Transacao();
+        transacao.setValor(dto.valor());
+        transacao.setDescricao(dto.descricao());
+        transacao.setCategoria(categoria);
+        transacao.setUsuario(usuario);
+
+        transacaoRepository.save(transacao);
+        return transacao;
     }
 }

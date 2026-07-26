@@ -20,7 +20,7 @@ public class TransacaoListener {
         log.info("Mensagem recebida da fila! Processando transação para: {}", dto.telefone());
 
         try {
-            transacaoService.registrarTransacao(dto);
+            transacaoService.processarTransacaoDaFila(dto);
             log.info("Transação salva no banco com sucesso via Mensageria!");
         } catch (Exception e) {
             log.error("Erro ao processar transação da fila: {}", e.getMessage());

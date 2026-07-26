@@ -1,0 +1,24 @@
+server:
+  port: 8081 # Roda na 8081 para não conflitar com o financial-service (que deve estar na 8080)
+
+spring:
+  application:
+    name: ai-service
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: admin
+    password: adminpassword
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: gpt-4o-mini
+          temperature: 0.0
+
+app:
+  financial-service:
+    url: http://localhost:8080
