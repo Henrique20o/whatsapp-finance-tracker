@@ -1,5 +1,5 @@
 server:
-  port: 8081 # Roda na 8081 para não conflitar com o financial-service (que deve estar na 8080)
+  port: 8081
 
 spring:
   application:
@@ -21,4 +21,4 @@ spring:
 
 app:
   financial-service:
-    url: http://localhost:8080
+    url: http://financial-service:8084

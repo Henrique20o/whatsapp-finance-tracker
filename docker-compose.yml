@@ -1,5 +1,4 @@
 services:
-
   postgres:
     image: postgres:15-alpine
     container_name: postgres_wa_finance
@@ -38,8 +37,48 @@ services:
       - WEBHOOK_FORMAT=json
     restart: unless-stopped
 
+  whatsapp-service:
+    build: ./whatsapp-service
+    container_name: whatsapp-service
+    ports:
+      - "8082:8080"
+    environment:
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
+    depends_on:
+      - rabbitmq
+
+  ai-service:
+    build: ./ai-service
+    container_name: ai-service
+    ports:
+      - "8083:8080"
+    environment:
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
+      - APP_FINANCIAL_SERVICE_URL=http://financial-service:8080
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - rabbitmq
+
+  financial-service:
+    build: ./financial-service
+    container_name: financial-service
+    ports:
+      - "8084:8080"
+    environment:
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/db_wa_finance
+      - SPRING_DATASOURCE_USERNAME=${DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASS}
+    depends_on:
+      - rabbitmq
+      - postgres
+
 volumes:
   postgres_data:
   rabbitmq_data:
-  redis_data:
-  evolution_instances:

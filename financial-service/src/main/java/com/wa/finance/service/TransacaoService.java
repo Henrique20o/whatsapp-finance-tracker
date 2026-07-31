@@ -23,7 +23,12 @@ public class TransacaoService {
     public Transacao processarTransacaoDaFila(TransacaoRequestDTO dto) {
 
         Usuario usuario = usuarioRepository.findByTelefone(dto.telefone())
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado para o telefone: " + dto.telefone()));
+                .orElseGet(() -> {
+                    Usuario novoUsuario = new Usuario();
+                    novoUsuario.setTelefone(dto.telefone());
+
+                    return usuarioRepository.save(novoUsuario);
+                });
 
         Categoria categoria = categoriaRepository
                 .findByNomeIgnoreCaseAndUsuarioId(dto.categoriaNome(), usuario.getId())
