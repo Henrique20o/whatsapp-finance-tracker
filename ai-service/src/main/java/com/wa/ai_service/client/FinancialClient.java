@@ -1,4 +1,4 @@
-package com.whatsapp_finance_tracker.ai_service.client;
+package com.wa.ai_service.client;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;

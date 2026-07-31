@@ -1,0 +1,14 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: whatsapp-service
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: admin
+    password: adminpassword
+app:
+  whatsapp:
+    numero-autorizado: "553171419903"

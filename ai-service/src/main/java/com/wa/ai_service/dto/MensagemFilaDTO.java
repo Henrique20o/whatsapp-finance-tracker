@@ -1,4 +1,4 @@
-package com.whatsapp_finance_tracker.ai_service.dto;
+package com.wa.ai_service.dto;
 
 public record MensagemFilaDTO(
         String telefone,

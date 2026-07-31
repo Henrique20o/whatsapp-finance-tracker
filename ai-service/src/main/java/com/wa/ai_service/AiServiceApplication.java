@@ -1,4 +1,4 @@
-package com.whatsapp_finance_tracker.ai_service;
+package com.wa.ai_service;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

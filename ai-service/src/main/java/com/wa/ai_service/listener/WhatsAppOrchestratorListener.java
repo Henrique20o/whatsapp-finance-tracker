@@ -1,9 +1,9 @@
-package com.whatsapp_finance_tracker.ai_service.listener;
+package com.wa.ai_service.listener;
 
-import com.whatsapp_finance_tracker.ai_service.config.RabbitMQConfig;
-import com.whatsapp_finance_tracker.ai_service.dto.MensagemFilaDTO;
-import com.whatsapp_finance_tracker.ai_service.dto.TransacaoRequestDTO;
-import com.whatsapp_finance_tracker.ai_service.service.LlmCategorizerService;
+import com.wa.ai_service.config.RabbitMQConfig;
+import com.wa.ai_service.dto.MensagemFilaDTO;
+import com.wa.ai_service.dto.TransacaoRequestDTO;
+import com.wa.ai_service.service.LlmCategorizerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -16,7 +16,7 @@ public class WhatsAppOrchestratorListener {
     private final LlmCategorizerService llmCategorizerService;
     private final RabbitTemplate rabbitTemplate; // Ferramenta do Spring para enviar msgs
 
-    @RabbitListener(queues = RabbitMQConfig.WHATSAPP_ENTRADA_QUEUE)
+    @RabbitListener(queues = RabbitMQConfig.WHATSAPP_INPUT_QUEUE)
     public void processarMensagemDoWhatsApp(MensagemFilaDTO mensagemBruta) {
 
         if ("TEXTO".equalsIgnoreCase(mensagemBruta.tipoMidia())) {

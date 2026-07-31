@@ -27,28 +27,16 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
 
-  redis:
-    image: redis:7-alpine
-    container_name: redis_evolution
-    restart: always
+  wuzapi:
+    image: asternic/wuzapi:latest
+    container_name: wuzapi
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-
-  evolution-api:
-    image: evoapicloud/evolution-api:latest
-    container_name: evolution-api
-    restart: always
-    depends_on:
-      - postgres
-      - redis
-    ports:
-      - "8084:8080"
-    env_file:
-      - .env
-    volumes:
-      - evolution_instances:/evolution/instances
+      - "8080:8080"
+    environment:
+      - WUZAPI_ADMIN_TOKEN=chavesecretacabulosa2000
+      - TZ=America/Sao_Paulo
+      - WEBHOOK_FORMAT=json
+    restart: unless-stopped
 
 volumes:
   postgres_data:

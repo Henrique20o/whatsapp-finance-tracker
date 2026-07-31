@@ -1,7 +1,7 @@
-package com.whatsapp_finance_tracker.ai_service.service;
+package com.wa.ai_service.service;
 
-import com.whatsapp_finance_tracker.ai_service.client.FinancialClient;
-import com.whatsapp_finance_tracker.ai_service.dto.TransacaoRequestDTO;
+import com.wa.ai_service.client.FinancialClient;
+import com.wa.ai_service.dto.TransacaoRequestDTO;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
@@ -13,7 +13,6 @@ public class LlmCategorizerService {
     private final ChatClient chatClient;
     private final FinancialClient financialClient;
 
-    // O Spring Boot cuida de injetar o Builder do ChatClient automaticamente
     public LlmCategorizerService(ChatClient.Builder chatClientBuilder, FinancialClient financialClient) {
         this.chatClient = chatClientBuilder.build();
         this.financialClient = financialClient;
@@ -21,15 +20,12 @@ public class LlmCategorizerService {
 
     public TransacaoRequestDTO extrairTransacao(String telefone, String mensagemUsuario) {
 
-        // 1. Busca as categorias ativas lá no banco de dados do outro serviço
         List<String> categorias = financialClient.buscarCategoriasPorTelefone(telefone);
 
-        // Se a lista estiver vazia (usuário novo), avisamos a IA
         String categoriasContexto = categorias.isEmpty() ?
                 "Nenhuma categoria cadastrada ainda." :
                 String.join(", ", categorias);
 
-        // 2. Monta o Prompt de Sistema com a regra do "Get or Create"
         String systemPrompt = """
             Você é um assistente financeiro inteligente. Sua tarefa é analisar o texto do usuário \
             e extrair os dados do gasto.
