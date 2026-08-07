@@ -12,3 +12,6 @@ spring:
 app:
   whatsapp:
     numero-autorizado: "553171419903"
+wuzapi:
+  base-url: $[WUZAPI_BASE_URL]
+  token: $[AUTHENTICATION_API_KEY]

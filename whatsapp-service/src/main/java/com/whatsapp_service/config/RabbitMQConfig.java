@@ -11,11 +11,17 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMQConfig {
 
     public static final String WHATSAPP_INPUT_QUEUE = "financeiro.v1.whatsapp-entrada";
-
+    public static final String WHATSAPP_OUTPUT_QUEUE = "financeiro.v1.whatsapp-saida";
     @Bean
     public Queue whatsappInputQueue() {
         return QueueBuilder
                 .durable(WHATSAPP_INPUT_QUEUE)
+                .build();
+    }
+    @Bean
+    public Queue whatsappOutputQueue() {
+        return QueueBuilder
+                .durable(WHATSAPP_OUTPUT_QUEUE)
                 .build();
     }
 
