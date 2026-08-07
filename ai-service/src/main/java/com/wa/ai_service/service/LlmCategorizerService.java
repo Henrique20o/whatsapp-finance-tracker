@@ -33,9 +33,8 @@ public class LlmCategorizerService {
             REGRAS DE CATEGORIZAÇÃO:
             O usuário já possui as seguintes categorias: {categorias_validas}.
             Tente encaixar o gasto em uma dessas categorias. 
-            Se o gasto NÃO se encaixar em nenhuma delas, ou se o usuário pedir explicitamente \
-            para usar uma categoria nova, você tem permissão para criar um nome curto e \
-            apropriado para uma nova categoria.
+            Se o gasto NÃO se encaixar em nenhuma delas, mande a categoria como "Outros".
+            Caso o usuario peça explicitamente para criar uma nova categoria, você deve respeitar o pedido e criar a nova categoria com um nome adequado, mas não invente novas categorias por conta própria.
             
             O telefone do usuário é {telefone_usuario}. Mantenha este telefone no objeto de retorno.
             """;

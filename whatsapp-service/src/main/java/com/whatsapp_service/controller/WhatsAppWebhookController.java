@@ -44,7 +44,6 @@ public class WhatsAppWebhookController {
                     .getTelefone();
 
 
-            // Ignora LID ou mensagens sem telefone válido
             if (telefone == null) {
                 log.debug("Mensagem ignorada sem telefone válido");
                 return ResponseEntity.ok().build();

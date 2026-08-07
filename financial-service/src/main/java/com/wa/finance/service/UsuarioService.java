@@ -36,7 +36,7 @@ public class UsuarioService {
 
     private void criarCategoriasPadrao(Usuario usuario) {
         List<String> categoriasPadrao = List.of(
-                "Alimentação", "Transporte", "Lazer", "Saúde", "Moradia", "Outros"
+                "Moradia", "Alimentação", "Transporte", "Saúde e bem-estar", "Cuidado pessoal", "Lazer", "Educação", "Pets", "Doações e presentes", "Tecnologia", "Profissional", "Outros"
         );
 
         categoriasPadrao.forEach(nome -> {
