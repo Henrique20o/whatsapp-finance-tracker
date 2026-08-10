@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    public static final String TRANSACTION_QUEUE = "transacoes.financeiras.queue";
+    public static final String TRANSACTION_QUEUE = "financeiro.v1.transacoes-entrada";
 
     public static final String WHATSAPP_INPUT_QUEUE = "financeiro.v1.whatsapp-entrada";
 

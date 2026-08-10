@@ -5,13 +5,10 @@ spring:
   application:
     name: whatsapp-service
   rabbitmq:
-    host: localhost
+    host: rabbitmq
     port: 5672
-    username: admin
-    password: adminpassword
-app:
-  whatsapp:
-    numero-autorizado: "553171419903"
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASS}
 wuzapi:
-  base-url: $[WUZAPI_BASE_URL]
-  token: $[AUTHENTICATION_API_KEY]
+  url: ${WUZAPI_BASE_URL}
+  token: ${AUTHENTICATION_API_KEY}

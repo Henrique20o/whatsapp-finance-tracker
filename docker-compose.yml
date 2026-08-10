@@ -46,6 +46,8 @@ services:
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
+      - WUZAPI_BASE_URL=http://wuzapi:8080
+      - AUTHENTICATION_API_KEY=${AUTHENTICATION_API_KEY}
     depends_on:
       - rabbitmq
 
