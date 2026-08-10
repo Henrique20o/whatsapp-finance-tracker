@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: 8080
 
 spring:
   application:
@@ -21,4 +21,10 @@ spring:
 
 app:
   financial-service:
-    url: http://financial-service:8084
+    url: ${APP_FINANCIAL_SERVICE_URL:http://localhost:8084}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

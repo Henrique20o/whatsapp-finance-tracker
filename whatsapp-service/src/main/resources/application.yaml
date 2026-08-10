@@ -1,5 +1,5 @@
 server:
-  port: 8082
+  port: 8080
 
 spring:
   application:
@@ -12,3 +12,9 @@ spring:
 wuzapi:
   url: ${WUZAPI_BASE_URL}
   token: ${AUTHENTICATION_API_KEY}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

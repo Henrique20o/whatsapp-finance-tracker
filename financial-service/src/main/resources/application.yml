@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/db_wa_finance
-    username: ${DB_USER:postgres}
-    password: ${DB_PASS:postgrespassword}
+    username: ${DB_USER}
+    password: ${DB_PASS}
     driver-class-name: org.postgresql.Driver
 
   rabbitmq:
@@ -20,3 +20,9 @@ spring:
         format_sql: true
         jdbc:
           time_zone: America/Sao_Paulo
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

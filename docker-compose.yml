@@ -9,9 +9,15 @@ services:
       POSTGRES_PASSWORD: ${DB_PASS}
       TZ: America/Sao_Paulo
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -25,6 +31,12 @@ services:
       - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   wuzapi:
     image: asternic/wuzapi:latest
@@ -32,7 +44,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - WUZAPI_ADMIN_TOKEN=chavesecretacabulosa2000
+      - WUZAPI_ADMIN_TOKEN=${WUZAPI_ADMIN_TOKEN:?Defina WUZAPI_ADMIN_TOKEN no arquivo .env}
       - TZ=America/Sao_Paulo
       - WEBHOOK_FORMAT=json
     restart: unless-stopped
@@ -49,7 +61,8 @@ services:
       - WUZAPI_BASE_URL=http://wuzapi:8080
       - AUTHENTICATION_API_KEY=${AUTHENTICATION_API_KEY}
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   ai-service:
     build: ./ai-service
@@ -63,7 +76,10 @@ services:
       - APP_FINANCIAL_SERVICE_URL=http://financial-service:8080
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+      financial-service:
+        condition: service_healthy
 
   financial-service:
     build: ./financial-service
@@ -78,8 +94,16 @@ services:
       - SPRING_DATASOURCE_USERNAME=${DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASS}
     depends_on:
-      - rabbitmq
-      - postgres
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/actuator/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
 volumes:
   postgres_data:
