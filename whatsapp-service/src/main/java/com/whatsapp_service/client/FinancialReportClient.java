@@ -1,6 +1,7 @@
 package com.whatsapp_service.client;
 
 import com.whatsapp_service.dto.ResumoFinanceiroDTO;
+import com.whatsapp_service.dto.CancelamentoTransacaoDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -25,5 +26,15 @@ public class FinancialReportClient {
                         .build())
                 .retrieve()
                 .body(ResumoFinanceiroDTO.class);
+    }
+
+    public CancelamentoTransacaoDTO cancelarTransacao(Long transacaoId, String telefone) {
+        return restClient.delete()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/v1/transacoes/{id}")
+                        .queryParam("telefone", telefone)
+                        .build(transacaoId))
+                .retrieve()
+                .body(CancelamentoTransacaoDTO.class);
     }
 }

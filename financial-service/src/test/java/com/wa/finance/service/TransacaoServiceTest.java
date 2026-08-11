@@ -77,7 +77,11 @@ class TransacaoServiceTest {
         when(categoriaRepository.findByNomeIgnoreCaseAndUsuarioId(dto.categoriaNome(), usuario.getId()))
                 .thenReturn(Optional.of(categoria));
         when(transacaoRepository.saveAndFlush(any(Transacao.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(invocation -> {
+                    Transacao transacao = invocation.getArgument(0);
+                    transacao.setId(99L);
+                    return transacao;
+                });
 
         Transacao resultado = transacaoService.processarTransacaoDaFila(dto);
 
@@ -88,6 +92,44 @@ class TransacaoServiceTest {
         ArgumentCaptor<RespostaUsuarioDTO> resposta = ArgumentCaptor.forClass(RespostaUsuarioDTO.class);
         verify(responseProducer).enviar(resposta.capture());
         assertThat(resposta.getValue().telefone()).isEqualTo(dto.telefone());
+        assertThat(resposta.getValue().transacaoIdCancelavel()).isEqualTo(99L);
+    }
+
+    @Test
+    void deveCancelarTransacaoDoProprioUsuario() {
+        Usuario usuario = Usuario.builder().id(1L).telefone("5531999998888").build();
+        Transacao transacao = Transacao.builder()
+                .id(99L)
+                .usuario(usuario)
+                .valor(new BigDecimal("50.00"))
+                .deletado(false)
+                .build();
+        when(transacaoRepository.findByIdAndUsuarioTelefone(99L, usuario.getTelefone()))
+                .thenReturn(Optional.of(transacao));
+
+        var resultado = transacaoService.cancelar(99L, usuario.getTelefone());
+
+        assertThat(resultado.canceladaAgora()).isTrue();
+        assertThat(transacao.getDeletado()).isTrue();
+        verify(transacaoRepository).save(transacao);
+    }
+
+    @Test
+    void deveSerIdempotenteAoCancelarNovamente() {
+        Usuario usuario = Usuario.builder().id(1L).telefone("5531999998888").build();
+        Transacao transacao = Transacao.builder()
+                .id(99L)
+                .usuario(usuario)
+                .valor(new BigDecimal("50.00"))
+                .deletado(true)
+                .build();
+        when(transacaoRepository.findByIdAndUsuarioTelefone(99L, usuario.getTelefone()))
+                .thenReturn(Optional.of(transacao));
+
+        var resultado = transacaoService.cancelar(99L, usuario.getTelefone());
+
+        assertThat(resultado.canceladaAgora()).isFalse();
+        verify(transacaoRepository, never()).save(any());
     }
 
     private TransacaoRequestDTO novaRequisicao(String messageId) {

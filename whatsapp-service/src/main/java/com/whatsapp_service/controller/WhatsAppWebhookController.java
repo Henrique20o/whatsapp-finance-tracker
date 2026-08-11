@@ -88,6 +88,20 @@ public class WhatsAppWebhookController {
 
             String comando = normalizar(texto);
 
+            if (comando.startsWith("cancelar_transacao_")) {
+                Long transacaoId = extrairTransacaoId(comando);
+                var cancelamento = financialReportClient.cancelarTransacao(transacaoId, telefone);
+                NumberFormat moeda = NumberFormat.getCurrencyInstance(Locale.of("pt", "BR"));
+
+                wuzApiClient.enviarMensagem(
+                        telefone,
+                        cancelamento.canceladaAgora()
+                                ? "↩️ Gasto de " + moeda.format(cancelamento.valor()) + " cancelado."
+                                : "ℹ️ Esse gasto já estava cancelado."
+                );
+                return ResponseEntity.ok().build();
+            }
+
             if (MENU_COMMANDS.contains(comando)) {
                 wuzApiClient.enviarMenuPrincipal(telefone);
                 return ResponseEntity.ok().build();
@@ -156,6 +170,14 @@ public class WhatsAppWebhookController {
                 .replaceAll("\\p{M}", "")
                 .trim()
                 .toLowerCase(Locale.ROOT);
+    }
+
+    private Long extrairTransacaoId(String comando) {
+        try {
+            return Long.valueOf(comando.substring("cancelar_transacao_".length()));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Identificador de cancelamento inválido", e);
+        }
     }
 
     private String formatarCategorias(

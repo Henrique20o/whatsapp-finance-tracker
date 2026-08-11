@@ -5,6 +5,7 @@ import com.wa.finance.domain.Transacao;
 import com.wa.finance.domain.Usuario;
 import com.wa.finance.dto.RespostaUsuarioDTO;
 import com.wa.finance.dto.TransacaoRequestDTO;
+import com.wa.finance.dto.CancelamentoTransacaoDTO;
 import com.wa.finance.producer.WhatsAppResponseProducer;
 import com.wa.finance.repository.CategoriaRepository;
 import com.wa.finance.repository.TransacaoRepository;
@@ -12,6 +13,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
 @RequiredArgsConstructor
@@ -68,9 +72,33 @@ public class TransacaoService {
                                 transacao.getDescricao() != null && !transacao.getDescricao().isBlank()
                                         ? "\n📝 Descrição: " + transacao.getDescricao()
                                         : ""
-                        )
+                        ),
+                        transacao.getId()
                 )
         );
         return transacao;
+    }
+
+    @Transactional
+    public CancelamentoTransacaoDTO cancelar(Long transacaoId, String telefone) {
+        Transacao transacao = transacaoRepository
+                .findByIdAndUsuarioTelefone(transacaoId, telefone)
+                .orElseThrow(() -> new ResponseStatusException(
+                        NOT_FOUND,
+                        "Transação não encontrada para o usuário"
+                ));
+
+        boolean canceladaAgora = !Boolean.TRUE.equals(transacao.getDeletado());
+
+        if (canceladaAgora) {
+            transacao.setDeletado(true);
+            transacaoRepository.save(transacao);
+        }
+
+        return new CancelamentoTransacaoDTO(
+                transacao.getId(),
+                transacao.getValor(),
+                canceladaAgora
+        );
     }
 }

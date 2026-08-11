@@ -93,4 +93,35 @@ public class WuzApiClient {
 
         log.info("Imagem enviada para {}", telefone);
     }
+
+    public void enviarConfirmacaoComCancelamento(
+            String telefone,
+            String mensagem,
+            Long transacaoId
+    ) {
+        RestClient client = restClientBuilder
+                .baseUrl(url)
+                .build();
+
+        SendTemplateRequest confirmacao = new SendTemplateRequest(
+                telefone,
+                mensagem,
+                "Gasto registrado",
+                "Use o botão abaixo caso queira desfazer este lançamento",
+                List.of(new SendTemplateRequest.Button(
+                        "reply",
+                        "✖ Cancelar",
+                        "cancelar_transacao_" + transacaoId
+                ))
+        );
+
+        client.post()
+                .uri("/chat/send/buttons")
+                .header("Token", token)
+                .body(confirmacao)
+                .retrieve()
+                .toBodilessEntity();
+
+        log.info("Confirmação cancelável enviada para {}", telefone);
+    }
 }

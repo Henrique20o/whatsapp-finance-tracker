@@ -25,10 +25,18 @@ public class WhatsAppResponseListener {
 
         try {
 
-            wuzapiClient.enviarMensagem(
-                    resposta.telefone(),
-                    resposta.mensagem()
-            );
+            if (resposta.transacaoIdCancelavel() != null) {
+                wuzapiClient.enviarConfirmacaoComCancelamento(
+                        resposta.telefone(),
+                        resposta.mensagem(),
+                        resposta.transacaoIdCancelavel()
+                );
+            } else {
+                wuzapiClient.enviarMensagem(
+                        resposta.telefone(),
+                        resposta.mensagem()
+                );
+            }
 
             log.info(
                     "Mensagem enviada com sucesso para {}",

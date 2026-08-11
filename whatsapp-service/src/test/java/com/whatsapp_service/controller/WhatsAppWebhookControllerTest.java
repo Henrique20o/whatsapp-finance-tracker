@@ -5,6 +5,7 @@ import com.whatsapp_service.client.FinancialReportClient;
 import com.whatsapp_service.dto.MensagemFilaDTO;
 import com.whatsapp_service.dto.ResumoFinanceiroDTO;
 import com.whatsapp_service.dto.GastoPorCategoriaDTO;
+import com.whatsapp_service.dto.CancelamentoTransacaoDTO;
 import com.whatsapp_service.dto.WuzapiWebhookPayload;
 import com.whatsapp_service.producer.WhatsAppQueueProducer;
 import com.whatsapp_service.service.ConversationStateService;
@@ -241,6 +242,39 @@ class WhatsAppWebhookControllerTest {
                 "5531999998888",
                 "Gastos por categoria nos últimos 30 dias",
                 "data:image/png;base64,imagem"
+        );
+        verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void deveCancelarTransacaoIndicadaPeloBotao() throws Exception {
+        WuzapiWebhookPayload payload = payload("Message", """
+                {
+                  "Info": {
+                    "ID": "message-cancel",
+                    "Sender": "5531999998888@s.whatsapp.net"
+                  },
+                  "Message": {
+                    "templateButtonReplyMessage": {
+                      "selectedID": "cancelar_transacao_99",
+                      "selectedDisplayText": "✖ Cancelar"
+                    }
+                  }
+                }
+                """);
+        when(financialReportClient.cancelarTransacao(99L, "5531999998888"))
+                .thenReturn(new CancelamentoTransacaoDTO(
+                        99L,
+                        new BigDecimal("50.00"),
+                        true
+                ));
+
+        controller.receberMensagem(payload);
+
+        verify(financialReportClient).cancelarTransacao(99L, "5531999998888");
+        verify(wuzApiClient).enviarMensagem(
+                org.mockito.ArgumentMatchers.eq("5531999998888"),
+                org.mockito.ArgumentMatchers.contains("cancelado")
         );
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
     }

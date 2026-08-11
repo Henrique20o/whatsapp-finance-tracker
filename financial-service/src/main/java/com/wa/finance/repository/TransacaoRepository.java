@@ -14,6 +14,8 @@ import java.util.Optional;
 public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     Optional<Transacao> findByExternalMessageId(String externalMessageId);
 
+    Optional<Transacao> findByIdAndUsuarioTelefone(Long id, String telefone);
+
     @Query("""
             select coalesce(sum(t.valor), 0)
             from Transacao t

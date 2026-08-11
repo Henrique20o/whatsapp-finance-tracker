@@ -2,6 +2,7 @@ package com.wa.finance.controller;
 
 import com.wa.finance.domain.Transacao;
 import com.wa.finance.dto.TransacaoRequestDTO;
+import com.wa.finance.dto.CancelamentoTransacaoDTO;
 import com.wa.finance.service.TransacaoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,5 +21,13 @@ public class TransacaoController {
     public ResponseEntity<Transacao> registrarTransacao(@Valid @RequestBody TransacaoRequestDTO dto) {
         Transacao transacaoSalva = transacaoService.processarTransacaoDaFila(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(transacaoSalva);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<CancelamentoTransacaoDTO> cancelarTransacao(
+            @PathVariable Long id,
+            @RequestParam String telefone
+    ) {
+        return ResponseEntity.ok(transacaoService.cancelar(id, telefone));
     }
 }

@@ -54,12 +54,19 @@ public record WuzapiWebhookPayload(
 
     public record ButtonReply(
             @JsonProperty("selectedDisplayText") String selectedDisplayText,
-            @JsonProperty("selectedButtonId") String selectedButtonId
+            @JsonProperty("selectedButtonId") String selectedButtonId,
+            @JsonProperty("selectedID") String selectedId
     ) {
         public String getTexto() {
-            return selectedDisplayText != null && !selectedDisplayText.isBlank()
-                    ? selectedDisplayText
-                    : selectedButtonId;
+            if (selectedId != null && !selectedId.isBlank()) {
+                return selectedId;
+            }
+
+            if (selectedButtonId != null && !selectedButtonId.isBlank()) {
+                return selectedButtonId;
+            }
+
+            return selectedDisplayText;
         }
     }
 }
