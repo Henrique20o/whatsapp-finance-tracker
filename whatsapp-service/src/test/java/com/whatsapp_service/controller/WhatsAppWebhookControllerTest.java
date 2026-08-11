@@ -10,6 +10,8 @@ import com.whatsapp_service.dto.WuzapiWebhookPayload;
 import com.whatsapp_service.producer.WhatsAppQueueProducer;
 import com.whatsapp_service.service.ConversationStateService;
 import com.whatsapp_service.service.PieChartService;
+import com.whatsapp_service.flow.WhatsAppActionResolver;
+import com.whatsapp_service.flow.WhatsAppFlowRouter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,13 +54,17 @@ class WhatsAppWebhookControllerTest {
     @BeforeEach
     void configurar() {
         objectMapper = new ObjectMapper();
-        controller = new WhatsAppWebhookController(
+        WhatsAppFlowRouter flowRouter = new WhatsAppFlowRouter(
+                new WhatsAppActionResolver(),
                 producer,
-                objectMapper,
                 wuzApiClient,
                 conversationStateService,
                 financialReportClient,
                 pieChartService
+        );
+        controller = new WhatsAppWebhookController(
+                objectMapper,
+                flowRouter
         );
     }
 
