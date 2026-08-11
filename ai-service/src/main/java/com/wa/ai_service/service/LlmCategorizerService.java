@@ -24,7 +24,15 @@ public class LlmCategorizerService {
     public TransacaoExtraidaDTO extrairTransacao(String telefone, String mensagemUsuario) {
 
         List<String> categoriasRecebidas = financialClient.buscarCategoriasPorTelefone(telefone);
-        List<String> categorias = categoriasRecebidas == null ? List.of() : categoriasRecebidas;
+        List<String> categorias = categoriasRecebidas == null
+                ? List.of()
+                : categoriasRecebidas.stream()
+                        .filter(categoria -> categoria != null && !categoria.isBlank())
+                        .toList();
+
+        if (categorias.isEmpty()) {
+            throw new IllegalStateException("Nenhuma categoria disponível para classificar a transação");
+        }
 
         String categoriasContexto = categorias.isEmpty()
                 ? "- Nenhuma categoria cadastrada"
@@ -67,12 +75,51 @@ public class LlmCategorizerService {
             Extraia tambÃ©m valor e descriÃ§Ã£o. O telefone do usuÃ¡rio Ã© {telefone_usuario}.
             """;
 
-        return chatClient.prompt()
+        TransacaoExtraidaDTO transacaoExtraida = chatClient.prompt()
                 .system(sp -> sp.text(systemPrompt)
                         .param("categorias_validas", categoriasContexto)
                         .param("telefone_usuario", telefone))
                 .user(mensagemUsuario)
                 .call()
                 .entity(TransacaoExtraidaDTO.class);
+
+        if (transacaoExtraida == null) {
+            throw new IllegalStateException("A IA não retornou uma transação válida");
+        }
+
+        String categoriaValidada = validarCategoria(transacaoExtraida.categoriaNome(), categorias);
+
+        return new TransacaoExtraidaDTO(
+                telefone,
+                transacaoExtraida.valor(),
+                transacaoExtraida.descricao(),
+                categoriaValidada
+        );
+    }
+
+    static String validarCategoria(String categoriaSugerida, List<String> categoriasDisponiveis) {
+        if (categoriasDisponiveis == null || categoriasDisponiveis.isEmpty()) {
+            throw new IllegalStateException("Nenhuma categoria disponível para validação");
+        }
+
+        if (categoriaSugerida != null) {
+            String categoriaNormalizada = categoriaSugerida.trim();
+
+            return categoriasDisponiveis.stream()
+                    .filter(categoria -> categoria.equalsIgnoreCase(categoriaNormalizada))
+                    .findFirst()
+                    .orElseGet(() -> buscarCategoriaOutros(categoriasDisponiveis));
+        }
+
+        return buscarCategoriaOutros(categoriasDisponiveis);
+    }
+
+    private static String buscarCategoriaOutros(List<String> categoriasDisponiveis) {
+        return categoriasDisponiveis.stream()
+                .filter(categoria -> categoria.equalsIgnoreCase("Outros"))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "A categoria retornada pela IA não pertence ao catálogo do usuário"
+                ));
     }
 }
