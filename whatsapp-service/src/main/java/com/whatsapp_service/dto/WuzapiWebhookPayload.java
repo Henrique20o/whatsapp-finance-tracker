@@ -1,6 +1,7 @@
 package com.whatsapp_service.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import tools.jackson.databind.JsonNode;
 
 public record WuzapiWebhookPayload(
 
@@ -8,7 +9,7 @@ public record WuzapiWebhookPayload(
         String type,
 
         @JsonProperty("event")
-        Event event
+        JsonNode event
 
 ) {
 
@@ -24,6 +25,9 @@ public record WuzapiWebhookPayload(
 
 
     public record Info(
+
+            @JsonProperty("ID")
+            String id,
 
             @JsonProperty("Sender")
             String sender,

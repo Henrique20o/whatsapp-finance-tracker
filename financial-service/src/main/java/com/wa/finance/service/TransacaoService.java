@@ -8,30 +8,33 @@ import com.wa.finance.dto.TransacaoRequestDTO;
 import com.wa.finance.producer.WhatsAppResponseProducer;
 import com.wa.finance.repository.CategoriaRepository;
 import com.wa.finance.repository.TransacaoRepository;
-import com.wa.finance.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TransacaoService {
 
     private final TransacaoRepository transacaoRepository;
     private final CategoriaRepository categoriaRepository;
-    private final UsuarioRepository usuarioRepository;
+    private final UsuarioService usuarioService;
     private final WhatsAppResponseProducer responseProducer;
 
     @Transactional
     public Transacao processarTransacaoDaFila(TransacaoRequestDTO dto) {
 
-        Usuario usuario = usuarioRepository.findByTelefone(dto.telefone())
-                .orElseGet(() -> {
-                    Usuario novoUsuario = new Usuario();
-                    novoUsuario.setTelefone(dto.telefone());
+        if (dto.messageId() != null && !dto.messageId().isBlank()) {
+            var transacaoExistente = transacaoRepository.findByExternalMessageId(dto.messageId());
+            if (transacaoExistente.isPresent()) {
+                log.info("Mensagem {} jÃ¡ processada; transaÃ§Ã£o duplicada ignorada", dto.messageId());
+                return transacaoExistente.get();
+            }
+        }
 
-                    return usuarioRepository.save(novoUsuario);
-                });
+        Usuario usuario = usuarioService.buscarOuCriarUsuarioPorTelefone(dto.telefone());
 
         Categoria categoria = categoriaRepository
                 .findByNomeIgnoreCaseAndUsuarioId(dto.categoriaNome(), usuario.getId())
@@ -45,24 +48,29 @@ public class TransacaoService {
                 });
 
         Transacao transacao = new Transacao();
+        transacao.setExternalMessageId(dto.messageId());
         transacao.setValor(dto.valor());
         transacao.setDescricao(dto.descricao());
         transacao.setCategoria(categoria);
         transacao.setUsuario(usuario);
 
-        transacaoRepository.save(transacao);
+        transacaoRepository.saveAndFlush(transacao);
 
         responseProducer.enviar(
                 new RespostaUsuarioDTO(
                         usuario.getTelefone(),
                         String.format(
-                                "✅ Gasto de R$ %.2f registrado em %s.",
+                                "✅ *Gasto Registrado!*\n\n" +
+                                        "💰 Valor: R$ %.2f\n" +
+                                        "📂 Categoria: %s%s",
                                 transacao.getValor(),
-                                categoria.getNome()
+                                categoria.getNome(),
+                                transacao.getDescricao() != null && !transacao.getDescricao().isBlank()
+                                        ? "\n📝 Descrição: " + transacao.getDescricao()
+                                        : ""
                         )
                 )
         );
-
         return transacao;
     }
 }

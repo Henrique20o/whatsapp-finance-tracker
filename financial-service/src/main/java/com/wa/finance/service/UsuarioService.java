@@ -19,8 +19,11 @@ public class UsuarioService {
 
     @Transactional
     public Usuario buscarOuCriarUsuarioPorTelefone(String telefone) {
-        return usuarioRepository.findByTelefone(telefone)
+        Usuario usuario = usuarioRepository.findByTelefone(telefone)
                 .orElseGet(() -> criarNovoUsuario(telefone));
+
+        garantirCategoriasPadrao(usuario);
+        return usuario;
     }
 
     private Usuario criarNovoUsuario(String telefone) {
@@ -29,17 +32,19 @@ public class UsuarioService {
                 .build();
 
         Usuario usuarioSalvo = usuarioRepository.save(novoUsuario);
-        criarCategoriasPadrao(usuarioSalvo);
-
         return usuarioSalvo;
     }
 
-    private void criarCategoriasPadrao(Usuario usuario) {
+    private void garantirCategoriasPadrao(Usuario usuario) {
         List<String> categoriasPadrao = List.of(
                 "Contas domésticas", "Alimentação", "Transporte", "Saúde e bem-estar", "Cuidado pessoal", "Lazer", "Educação", "Pets", "Doações e presentes", "Tecnologia", "Profissional", "Outros"
         );
 
         categoriasPadrao.forEach(nome -> {
+            if (categoriaRepository.existsByNomeIgnoreCaseAndUsuarioId(nome, usuario.getId())) {
+                return;
+            }
+
             Categoria categoria = Categoria.builder()
                     .nome(nome)
                     .usuario(usuario)

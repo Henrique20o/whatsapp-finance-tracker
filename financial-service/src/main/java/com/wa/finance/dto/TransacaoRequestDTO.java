@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 
 public record TransacaoRequestDTO(
+        String messageId,
+
         @NotBlank(message = "O telefone do usuário é obrigatório")
         String telefone,
 

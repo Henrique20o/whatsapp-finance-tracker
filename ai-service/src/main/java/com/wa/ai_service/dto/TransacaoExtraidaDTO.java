@@ -2,8 +2,7 @@ package com.wa.ai_service.dto;
 
 import java.math.BigDecimal;
 
-public record TransacaoRequestDTO(
-        String messageId,
+public record TransacaoExtraidaDTO(
         String telefone,
         BigDecimal valor,
         String descricao,

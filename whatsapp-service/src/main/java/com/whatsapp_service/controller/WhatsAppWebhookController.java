@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @RestController
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 public class WhatsAppWebhookController {
 
     private final WhatsAppQueueProducer producer;
+    private final ObjectMapper objectMapper;
 
 
 
@@ -31,17 +33,36 @@ public class WhatsAppWebhookController {
             }
 
 
-            if (payload.event() == null ||
-                    payload.event().info() == null) {
+            if (payload.event() == null || !payload.event().isObject()) {
+
+                log.debug("Evento do WuzAPI ignorado por nÃ£o possuir payload de mensagem");
+                return ResponseEntity.ok().build();
+            }
+
+            WuzapiWebhookPayload.Event event = objectMapper.treeToValue(
+                    payload.event(),
+                    WuzapiWebhookPayload.Event.class
+            );
+
+            if (event.info() == null) {
 
                 log.warn("Webhook recebido sem informações do remetente");
                 return ResponseEntity.ok().build();
             }
 
 
-            String telefone = payload.event()
+            String telefone = event
                     .info()
                     .getTelefone();
+
+            String messageId = event
+                    .info()
+                    .id();
+
+            if (messageId == null || messageId.isBlank()) {
+                log.warn("Mensagem ignorada sem identificador do WuzAPI");
+                return ResponseEntity.ok().build();
+            }
 
 
             if (telefone == null) {
@@ -52,12 +73,12 @@ public class WhatsAppWebhookController {
 
 
 
-            if (payload.event().message() == null) {
+            if (event.message() == null) {
                 return ResponseEntity.ok().build();
             }
 
 
-            String texto = payload.event()
+            String texto = event
                     .message()
                     .conversation();
 
@@ -66,6 +87,7 @@ public class WhatsAppWebhookController {
 
                 MensagemFilaDTO dto =
                         new MensagemFilaDTO(
+                                messageId,
                                 telefone,
                                 "TEXTO",
                                 texto

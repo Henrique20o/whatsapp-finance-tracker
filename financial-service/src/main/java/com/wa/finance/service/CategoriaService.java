@@ -10,8 +10,10 @@ import java.util.List;
 public class CategoriaService {
 
     private final CategoriaRepository categoriaRepository;
+    private final UsuarioService usuarioService;
 
     public List<String> buscarNomesCategoriasPorTelefone(String telefone) {
+        usuarioService.buscarOuCriarUsuarioPorTelefone(telefone);
         return categoriaRepository.findNomesCategoriasAtivasByTelefone(telefone);
     }
 }

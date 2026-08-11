@@ -8,7 +8,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tb_transacao")
+@Table(
+        name = "tb_transacao",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_transacao_external_message_id",
+                columnNames = "external_message_id"
+        )
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -19,6 +25,9 @@ public class Transacao {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "external_message_id")
+    private String externalMessageId;
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal valor;
