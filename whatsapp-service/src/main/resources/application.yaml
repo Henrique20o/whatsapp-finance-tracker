@@ -13,6 +13,10 @@ wuzapi:
   url: ${WUZAPI_BASE_URL}
   token: ${AUTHENTICATION_API_KEY}
 
+app:
+  financial-service:
+    url: ${APP_FINANCIAL_SERVICE_URL:http://financial-service:8080}
+
 management:
   endpoints:
     web:

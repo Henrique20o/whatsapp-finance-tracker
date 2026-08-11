@@ -1,10 +1,14 @@
 package com.whatsapp_service.controller;
 
 import com.whatsapp_service.client.WuzApiClient;
+import com.whatsapp_service.client.FinancialReportClient;
 import com.whatsapp_service.dto.MensagemFilaDTO;
+import com.whatsapp_service.dto.ResumoFinanceiroDTO;
+import com.whatsapp_service.dto.GastoPorCategoriaDTO;
 import com.whatsapp_service.dto.WuzapiWebhookPayload;
 import com.whatsapp_service.producer.WhatsAppQueueProducer;
 import com.whatsapp_service.service.ConversationStateService;
+import com.whatsapp_service.service.PieChartService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,9 +19,13 @@ import org.springframework.http.HttpStatus;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WhatsAppWebhookControllerTest {
@@ -31,6 +39,12 @@ class WhatsAppWebhookControllerTest {
     @Mock
     private ConversationStateService conversationStateService;
 
+    @Mock
+    private FinancialReportClient financialReportClient;
+
+    @Mock
+    private PieChartService pieChartService;
+
     private ObjectMapper objectMapper;
     private WhatsAppWebhookController controller;
 
@@ -41,7 +55,9 @@ class WhatsAppWebhookControllerTest {
                 producer,
                 objectMapper,
                 wuzApiClient,
-                conversationStateService
+                conversationStateService,
+                financialReportClient,
+                pieChartService
         );
     }
 
@@ -176,6 +192,55 @@ class WhatsAppWebhookControllerTest {
         verify(wuzApiClient).enviarMensagem(
                 "5531999998888",
                 "Envie agora a descrição do gasto. Exemplo: Gastei 50 reais no futebol."
+        );
+        verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void deveEnviarResumoSemAcionarIaAoClicarEmVerRelatorio() throws Exception {
+        WuzapiWebhookPayload payload = payload("Message", """
+                {
+                  "Info": {
+                    "ID": "message-report",
+                    "Sender": "5531999998888@s.whatsapp.net"
+                  },
+                  "Message": {
+                    "buttonsResponseMessage": {
+                      "selectedButtonId": "ver_relatorio"
+                    }
+                  }
+                }
+                """);
+        when(financialReportClient.buscarResumo("5531999998888"))
+                .thenReturn(new ResumoFinanceiroDTO(
+                        new BigDecimal("150.50"),
+                        new BigDecimal("620.90"),
+                        List.of(
+                                new GastoPorCategoriaDTO("Alimentação", new BigDecimal("400.00")),
+                                new GastoPorCategoriaDTO("Lazer", new BigDecimal("220.90"))
+                        )
+                ));
+        when(pieChartService.gerarGraficoBase64(org.mockito.ArgumentMatchers.anyList()))
+                .thenReturn("data:image/png;base64,imagem");
+
+        controller.receberMensagem(payload);
+
+        verify(wuzApiClient).enviarMensagem(
+                org.mockito.ArgumentMatchers.eq("5531999998888"),
+                org.mockito.ArgumentMatchers.contains("R$ 150,50")
+        );
+        verify(wuzApiClient).enviarMensagem(
+                org.mockito.ArgumentMatchers.eq("5531999998888"),
+                org.mockito.ArgumentMatchers.contains("R$ 620,90")
+        );
+        verify(wuzApiClient).enviarMensagem(
+                org.mockito.ArgumentMatchers.eq("5531999998888"),
+                org.mockito.ArgumentMatchers.contains("Alimentação")
+        );
+        verify(wuzApiClient).enviarImagem(
+                "5531999998888",
+                "Gastos por categoria nos últimos 30 dias",
+                "data:image/png;base64,imagem"
         );
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
     }

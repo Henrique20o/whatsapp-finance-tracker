@@ -2,6 +2,7 @@ package com.whatsapp_service.client;
 
 import com.whatsapp_service.dto.SendTextRequest;
 import com.whatsapp_service.dto.SendTemplateRequest;
+import com.whatsapp_service.dto.SendImageRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -76,5 +77,20 @@ public class WuzApiClient {
                 .toBodilessEntity();
 
         log.info("Menu principal enviado para {}", telefone);
+    }
+
+    public void enviarImagem(String telefone, String legenda, String imagemBase64) {
+        RestClient client = restClientBuilder
+                .baseUrl(url)
+                .build();
+
+        client.post()
+                .uri("/chat/send/image")
+                .header("Token", token)
+                .body(new SendImageRequest(telefone, legenda, imagemBase64))
+                .retrieve()
+                .toBodilessEntity();
+
+        log.info("Imagem enviada para {}", telefone);
     }
 }

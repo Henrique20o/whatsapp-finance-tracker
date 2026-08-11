@@ -60,8 +60,11 @@ services:
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
       - WUZAPI_BASE_URL=http://wuzapi:8080
       - AUTHENTICATION_API_KEY=${AUTHENTICATION_API_KEY}
+      - APP_FINANCIAL_SERVICE_URL=http://financial-service:8080
     depends_on:
       rabbitmq:
+        condition: service_healthy
+      financial-service:
         condition: service_healthy
 
   ai-service:
