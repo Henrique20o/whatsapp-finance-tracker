@@ -12,6 +12,7 @@ import com.whatsapp_service.service.ConversationStateService;
 import com.whatsapp_service.service.PieChartService;
 import com.whatsapp_service.flow.WhatsAppActionResolver;
 import com.whatsapp_service.flow.WhatsAppFlowRouter;
+import com.whatsapp_service.security.WebhookSignatureVerifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +24,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.HexFormat;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
@@ -32,6 +37,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WhatsAppWebhookControllerTest {
+
+    private static final String HMAC_SECRET = "chave-hmac-de-teste-com-32-caracteres";
 
     @Mock
     private WhatsAppQueueProducer producer;
@@ -64,7 +71,8 @@ class WhatsAppWebhookControllerTest {
         );
         controller = new WhatsAppWebhookController(
                 objectMapper,
-                flowRouter
+                flowRouter,
+                new WebhookSignatureVerifier(HMAC_SECRET)
         );
     }
 
@@ -83,7 +91,7 @@ class WhatsAppWebhookControllerTest {
                 }
                 """);
 
-        var resposta = controller.receberMensagem(payload);
+        var resposta = receber(payload);
 
         ArgumentCaptor<MensagemFilaDTO> mensagem = ArgumentCaptor.forClass(MensagemFilaDTO.class);
         verify(producer).enviarParaProcessamento(mensagem.capture());
@@ -98,10 +106,31 @@ class WhatsAppWebhookControllerTest {
     }
 
     @Test
+    void deveRejeitarWebhookSemAssinatura() throws Exception {
+        byte[] rawBody = objectMapper.writeValueAsBytes(payload("Message", "{}"));
+
+        var resposta = controller.receberMensagem(null, rawBody);
+
+        assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void deveRejeitarWebhookComCorpoAlterado() throws Exception {
+        byte[] original = objectMapper.writeValueAsBytes(payload("Message", "{}"));
+        byte[] alterado = objectMapper.writeValueAsBytes(payload("ReadReceipt", "{}"));
+
+        var resposta = controller.receberMensagem(assinar(original), alterado);
+
+        assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void deveIgnorarTipoDeEventoQueNaoSejaMensagem() throws Exception {
         WuzapiWebhookPayload payload = payload("ReadReceipt", "\"code\"");
 
-        var resposta = controller.receberMensagem(payload);
+        var resposta = receber(payload);
 
         assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.OK);
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
@@ -111,7 +140,7 @@ class WhatsAppWebhookControllerTest {
     void deveIgnorarEventoDeMensagemQueNaoSejaObjeto() throws Exception {
         WuzapiWebhookPayload payload = payload("Message", "\"code\"");
 
-        var resposta = controller.receberMensagem(payload);
+        var resposta = receber(payload);
 
         assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.OK);
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
@@ -130,7 +159,7 @@ class WhatsAppWebhookControllerTest {
                 }
                 """);
 
-        var resposta = controller.receberMensagem(payload);
+        var resposta = receber(payload);
 
         assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.OK);
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
@@ -150,7 +179,7 @@ class WhatsAppWebhookControllerTest {
                 }
                 """);
 
-        controller.receberMensagem(payload);
+        receber(payload);
 
         ArgumentCaptor<MensagemFilaDTO> mensagem = ArgumentCaptor.forClass(MensagemFilaDTO.class);
         verify(producer).enviarParaProcessamento(mensagem.capture());
@@ -171,7 +200,7 @@ class WhatsAppWebhookControllerTest {
                 }
                 """);
 
-        controller.receberMensagem(payload);
+        receber(payload);
 
         verify(wuzApiClient).enviarMenuPrincipal("5531999998888");
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
@@ -193,7 +222,7 @@ class WhatsAppWebhookControllerTest {
                 }
                 """);
 
-        controller.receberMensagem(payload);
+        receber(payload);
 
         verify(conversationStateService).aguardarRegistroDeGasto("5531999998888");
         verify(wuzApiClient).enviarMensagem(
@@ -230,7 +259,7 @@ class WhatsAppWebhookControllerTest {
         when(pieChartService.gerarGraficoBase64(org.mockito.ArgumentMatchers.anyList()))
                 .thenReturn("data:image/png;base64,imagem");
 
-        controller.receberMensagem(payload);
+        receber(payload);
 
         verify(wuzApiClient).enviarMensagem(
                 org.mockito.ArgumentMatchers.eq("5531999998888"),
@@ -275,7 +304,7 @@ class WhatsAppWebhookControllerTest {
                         true
                 ));
 
-        controller.receberMensagem(payload);
+        receber(payload);
 
         verify(financialReportClient).cancelarTransacao(99L, "5531999998888");
         verify(wuzApiClient).enviarMensagem(
@@ -294,7 +323,7 @@ class WhatsAppWebhookControllerTest {
                 }
                 """);
 
-        controller.receberMensagem(payload);
+        receber(payload);
 
         verify(wuzApiClient).enviarMenuMaisOpcoes("5531999998888");
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
@@ -311,7 +340,7 @@ class WhatsAppWebhookControllerTest {
         when(financialReportClient.buscarCategorias("5531999998888"))
                 .thenReturn(List.of("Alimentação", "Lazer", "Outros"));
 
-        controller.receberMensagem(payload);
+        receber(payload);
 
         verify(wuzApiClient).enviarMensagem(
                 org.mockito.ArgumentMatchers.eq("5531999998888"),
@@ -329,7 +358,7 @@ class WhatsAppWebhookControllerTest {
                 }
                 """);
 
-        controller.receberMensagem(payload);
+        receber(payload);
 
         verify(wuzApiClient).enviarMenuPrincipal("5531999998888");
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
@@ -348,7 +377,7 @@ class WhatsAppWebhookControllerTest {
         when(financialReportClient.criarCategoria("5531999998888", "Viagens"))
                 .thenReturn("Viagens");
 
-        controller.receberMensagem(payload);
+        receber(payload);
 
         verify(financialReportClient).criarCategoria("5531999998888", "Viagens");
         verify(wuzApiClient).enviarMensagem(
@@ -371,7 +400,7 @@ class WhatsAppWebhookControllerTest {
         when(financialReportClient.desativarCategoria("5531999998888", "Viagens"))
                 .thenReturn("Viagens");
 
-        controller.receberMensagem(payload);
+        receber(payload);
 
         verify(financialReportClient).desativarCategoria("5531999998888", "Viagens");
         verify(wuzApiClient).enviarMensagem(
@@ -384,5 +413,16 @@ class WhatsAppWebhookControllerTest {
     private WuzapiWebhookPayload payload(String type, String eventJson) throws Exception {
         JsonNode event = objectMapper.readTree(eventJson);
         return new WuzapiWebhookPayload(type, event);
+    }
+
+    private org.springframework.http.ResponseEntity<Void> receber(WuzapiWebhookPayload payload) throws Exception {
+        byte[] rawBody = objectMapper.writeValueAsBytes(payload);
+        return controller.receberMensagem(assinar(rawBody), rawBody);
+    }
+
+    private String assinar(byte[] rawBody) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(HMAC_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        return HexFormat.of().formatHex(mac.doFinal(rawBody));
     }
 }

@@ -14,6 +14,8 @@ wuzapi:
   token: ${AUTHENTICATION_API_KEY}
 
 app:
+  security:
+    wuzapi-hmac-key: ${WUZAPI_HMAC_KEY}
   financial-service:
     url: ${APP_FINANCIAL_SERVICE_URL:http://financial-service:8080}
 

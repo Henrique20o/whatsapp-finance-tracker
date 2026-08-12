@@ -45,8 +45,12 @@ services:
       - "8080:8080"
     environment:
       - WUZAPI_ADMIN_TOKEN=${WUZAPI_ADMIN_TOKEN:?Defina WUZAPI_ADMIN_TOKEN no arquivo .env}
+      - WUZAPI_GLOBAL_HMAC_KEY=${WUZAPI_HMAC_KEY:?Defina WUZAPI_HMAC_KEY no arquivo .env}
+      - WUZAPI_GLOBAL_ENCRYPTION_KEY=${WUZAPI_GLOBAL_ENCRYPTION_KEY:?Defina WUZAPI_GLOBAL_ENCRYPTION_KEY no arquivo .env}
       - TZ=America/Sao_Paulo
       - WEBHOOK_FORMAT=json
+    volumes:
+      - wuzapi_data:/app/dbdata
     restart: unless-stopped
 
   whatsapp-service:
@@ -60,6 +64,7 @@ services:
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
       - WUZAPI_BASE_URL=http://wuzapi:8080
       - AUTHENTICATION_API_KEY=${AUTHENTICATION_API_KEY}
+      - WUZAPI_HMAC_KEY=${WUZAPI_HMAC_KEY:?Defina WUZAPI_HMAC_KEY no arquivo .env}
       - APP_FINANCIAL_SERVICE_URL=http://financial-service:8080
     depends_on:
       rabbitmq:
@@ -112,3 +117,4 @@ services:
 volumes:
   postgres_data:
   rabbitmq_data:
+  wuzapi_data:
