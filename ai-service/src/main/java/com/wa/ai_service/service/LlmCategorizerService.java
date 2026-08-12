@@ -40,14 +40,10 @@ public class LlmCategorizerService {
                         .map(categoria -> "- " + categoria)
                         .collect(Collectors.joining("\n"));
 
-        String telefoneMascarado = telefone == null || telefone.length() < 4
-                ? "****"
-                : "****" + telefone.substring(telefone.length() - 4);
-
         if (categorias.isEmpty()) {
-            log.warn("Nenhuma categoria encontrada para o telefone {}", telefoneMascarado);
+            log.warn("Nenhuma categoria encontrada para classificação");
         } else {
-            log.info("Categorias disponÃ­veis para {}: {}", telefoneMascarado, categorias);
+            log.info("Categorias disponíveis para classificação: {}", categorias);
         }
 
         String systemPrompt = """
@@ -72,13 +68,12 @@ public class LlmCategorizerService {
             - "Paguei a conta de luz ou Ã¡gua" -> Moradia, se Moradia estiver disponÃ­vel.
             - "Peguei Uber" ou "abasteci o carro" -> Transporte, se Transporte estiver disponÃ­vel.
 
-            Extraia tambÃ©m valor e descriÃ§Ã£o. O telefone do usuÃ¡rio Ã© {telefone_usuario}.
+            Extraia tambÃ©m valor e descriÃ§Ã£o.
             """;
 
         TransacaoExtraidaDTO transacaoExtraida = chatClient.prompt()
                 .system(sp -> sp.text(systemPrompt)
-                        .param("categorias_validas", categoriasContexto)
-                        .param("telefone_usuario", telefone))
+                        .param("categorias_validas", categoriasContexto))
                 .user(mensagemUsuario)
                 .call()
                 .entity(TransacaoExtraidaDTO.class);

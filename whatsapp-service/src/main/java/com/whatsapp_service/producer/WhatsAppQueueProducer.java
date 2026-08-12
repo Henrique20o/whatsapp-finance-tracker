@@ -15,8 +15,7 @@ public class WhatsAppQueueProducer {
     private final RabbitTemplate rabbitTemplate;
 
     public void enviarParaProcessamento(MensagemFilaDTO mensagem) {
-        log.info("Enviando mensagem do telefone {} para a fila de processamento (Tipo: {})",
-                mensagem.telefone(), mensagem.tipoMidia());
+        log.info("Enviando mensagem para a fila de processamento (Tipo: {})", mensagem.tipoMidia());
 
         rabbitTemplate.convertAndSend(RabbitMQConfig.WHATSAPP_INPUT_QUEUE, mensagem);
     }

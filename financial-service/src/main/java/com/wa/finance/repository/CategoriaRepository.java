@@ -12,8 +12,8 @@ import java.util.Optional;
 @Repository
 public interface CategoriaRepository extends JpaRepository<Categoria, Long> {
 
-    @Query("SELECT c.nome FROM Categoria c WHERE c.usuario.telefone = :telefone AND c.ativa = true")
-    List<String> findNomesCategoriasAtivasByTelefone(@Param("telefone") String telefone);
+    @Query("SELECT c.nome FROM Categoria c WHERE c.usuario.telefoneHash = :telefoneHash AND c.ativa = true")
+    List<String> findNomesCategoriasAtivasByTelefoneHash(@Param("telefoneHash") String telefoneHash);
 
     Optional<Categoria> findByNomeIgnoreCaseAndUsuarioId(String nome, Long usuarioId);
 

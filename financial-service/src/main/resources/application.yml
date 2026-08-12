@@ -13,16 +13,27 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
     properties:
       hibernate:
         format_sql: true
         jdbc:
           time_zone: America/Sao_Paulo
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-migration-naming: true
+
 management:
   endpoints:
     web:
       exposure:
         include: health
+
+app:
+  security:
+    phone-key: ${PHONE_ENCRYPTION_KEY}

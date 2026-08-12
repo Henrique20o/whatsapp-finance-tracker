@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+import com.wa.finance.security.PhoneProtectionService;
 import java.util.List;
 
 @Service
@@ -16,10 +17,13 @@ public class CategoriaService {
 
     private final CategoriaRepository categoriaRepository;
     private final UsuarioService usuarioService;
+    private final PhoneProtectionService phoneProtectionService;
 
     public List<String> buscarNomesCategoriasPorTelefone(String telefone) {
         usuarioService.buscarOuCriarUsuarioPorTelefone(telefone);
-        return categoriaRepository.findNomesCategoriasAtivasByTelefone(telefone);
+        return categoriaRepository.findNomesCategoriasAtivasByTelefoneHash(
+                phoneProtectionService.lookupHash(telefone)
+        );
     }
 
     @Transactional

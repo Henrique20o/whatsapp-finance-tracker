@@ -4,6 +4,7 @@ import com.wa.finance.domain.Categoria;
 import com.wa.finance.domain.Usuario;
 import com.wa.finance.repository.CategoriaRepository;
 import com.wa.finance.repository.UsuarioRepository;
+import com.wa.finance.security.PhoneProtectionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -30,6 +31,9 @@ class UsuarioServiceTest {
     @Mock
     private CategoriaRepository categoriaRepository;
 
+    @Mock
+    private PhoneProtectionService phoneProtectionService;
+
     @InjectMocks
     private UsuarioService usuarioService;
 
@@ -40,7 +44,9 @@ class UsuarioServiceTest {
                 .telefone("5531999998888")
                 .build();
 
-        when(usuarioRepository.findByTelefone(usuario.getTelefone())).thenReturn(Optional.of(usuario));
+        when(phoneProtectionService.normalize(usuario.getTelefone())).thenReturn(usuario.getTelefone());
+        when(phoneProtectionService.lookupHash(usuario.getTelefone())).thenReturn("hash-telefone");
+        when(usuarioRepository.findByTelefoneHash("hash-telefone")).thenReturn(Optional.of(usuario));
         when(categoriaRepository.existsByNomeIgnoreCaseAndUsuarioId(anyString(), eq(1L))).thenReturn(false);
 
         Usuario resultado = usuarioService.buscarOuCriarUsuarioPorTelefone(usuario.getTelefone());
@@ -66,7 +72,9 @@ class UsuarioServiceTest {
                 .telefone("5531999998888")
                 .build();
 
-        when(usuarioRepository.findByTelefone(usuario.getTelefone())).thenReturn(Optional.of(usuario));
+        when(phoneProtectionService.normalize(usuario.getTelefone())).thenReturn(usuario.getTelefone());
+        when(phoneProtectionService.lookupHash(usuario.getTelefone())).thenReturn("hash-telefone");
+        when(usuarioRepository.findByTelefoneHash("hash-telefone")).thenReturn(Optional.of(usuario));
         when(categoriaRepository.existsByNomeIgnoreCaseAndUsuarioId(anyString(), eq(1L))).thenReturn(true);
 
         usuarioService.buscarOuCriarUsuarioPorTelefone(usuario.getTelefone());

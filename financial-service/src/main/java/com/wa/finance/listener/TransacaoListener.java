@@ -17,7 +17,7 @@ public class TransacaoListener {
 
     @RabbitListener(queues = RabbitMQConfig.TRANSACTION_QUEUE)
     public void processarTransacao(TransacaoRequestDTO dto) {
-        log.info("Mensagem recebida da fila! Processando transação para: {}", dto.telefone());
+        log.info("Mensagem recebida da fila para processamento financeiro");
 
         try {
             transacaoService.processarTransacaoDaFila(dto);

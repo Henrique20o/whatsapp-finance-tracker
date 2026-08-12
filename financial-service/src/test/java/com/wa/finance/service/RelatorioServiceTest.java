@@ -2,6 +2,7 @@ package com.wa.finance.service;
 
 import com.wa.finance.repository.TransacaoRepository;
 import com.wa.finance.dto.GastoPorCategoriaDTO;
+import com.wa.finance.security.PhoneProtectionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -23,18 +24,23 @@ class RelatorioServiceTest {
     @Mock
     private TransacaoRepository transacaoRepository;
 
+    @Mock
+    private PhoneProtectionService phoneProtectionService;
+
     @InjectMocks
     private RelatorioService relatorioService;
 
     @Test
     void deveCalcularTotaisDeSeteETrintaDias() {
         String telefone = "5531999998888";
+        String telefoneHash = "hash-telefone";
+        when(phoneProtectionService.lookupHash(telefone)).thenReturn(telefoneHash);
         when(transacaoRepository.somarGastosDesde(
-                org.mockito.ArgumentMatchers.eq(telefone),
+                org.mockito.ArgumentMatchers.eq(telefoneHash),
                 org.mockito.ArgumentMatchers.any(LocalDateTime.class)
         )).thenReturn(new BigDecimal("150.50"), new BigDecimal("620.90"));
         when(transacaoRepository.somarGastosPorCategoriaDesde(
-                org.mockito.ArgumentMatchers.eq(telefone),
+                org.mockito.ArgumentMatchers.eq(telefoneHash),
                 org.mockito.ArgumentMatchers.any(LocalDateTime.class)
         )).thenReturn(List.of(
                 new GastoPorCategoriaDTO("Alimentação", new BigDecimal("400.00")),
@@ -50,7 +56,7 @@ class RelatorioServiceTest {
 
         ArgumentCaptor<LocalDateTime> inicios = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(transacaoRepository, org.mockito.Mockito.times(2))
-                .somarGastosDesde(org.mockito.ArgumentMatchers.eq(telefone), inicios.capture());
+                .somarGastosDesde(org.mockito.ArgumentMatchers.eq(telefoneHash), inicios.capture());
         assertThat(inicios.getAllValues().get(0)).isAfter(inicios.getAllValues().get(1));
     }
 }

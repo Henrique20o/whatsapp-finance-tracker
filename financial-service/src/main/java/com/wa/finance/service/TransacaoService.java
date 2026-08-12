@@ -6,6 +6,7 @@ import com.wa.finance.domain.Usuario;
 import com.wa.finance.dto.RespostaUsuarioDTO;
 import com.wa.finance.dto.TransacaoRequestDTO;
 import com.wa.finance.dto.CancelamentoTransacaoDTO;
+import com.wa.finance.dto.TransacaoResponseDTO;
 import com.wa.finance.producer.WhatsAppResponseProducer;
 import com.wa.finance.repository.CategoriaRepository;
 import com.wa.finance.repository.TransacaoRepository;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
+import com.wa.finance.security.PhoneProtectionService;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +28,12 @@ public class TransacaoService {
     private final CategoriaRepository categoriaRepository;
     private final UsuarioService usuarioService;
     private final WhatsAppResponseProducer responseProducer;
+    private final PhoneProtectionService phoneProtectionService;
+
+    @Transactional
+    public TransacaoResponseDTO registrarViaApi(TransacaoRequestDTO dto) {
+        return TransacaoResponseDTO.from(processarTransacaoDaFila(dto));
+    }
 
     @Transactional
     public Transacao processarTransacaoDaFila(TransacaoRequestDTO dto) {
@@ -62,7 +70,7 @@ public class TransacaoService {
 
         responseProducer.enviar(
                 new RespostaUsuarioDTO(
-                        usuario.getTelefone(),
+                        usuarioService.obterTelefone(usuario),
                         String.format(
                                 "✅ *Gasto Registrado!*\n\n" +
                                         "💰 Valor: R$ %.2f\n" +
@@ -82,7 +90,10 @@ public class TransacaoService {
     @Transactional
     public CancelamentoTransacaoDTO cancelar(Long transacaoId, String telefone) {
         Transacao transacao = transacaoRepository
-                .findByIdAndUsuarioTelefone(transacaoId, telefone)
+                .findByIdAndUsuarioTelefoneHash(
+                        transacaoId,
+                        phoneProtectionService.lookupHash(telefone)
+                )
                 .orElseThrow(() -> new ResponseStatusException(
                         NOT_FOUND,
                         "Transação não encontrada para o usuário"

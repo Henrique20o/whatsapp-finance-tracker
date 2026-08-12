@@ -25,8 +25,14 @@ public class Usuario {
     @Column(length = 100)
     private String email;
 
-    @Column(length = 20, unique = true, nullable = false)
+    @Transient
     private String telefone;
+
+    @Column(name = "telefone", length = 255, nullable = false)
+    private String telefoneCriptografado;
+
+    @Column(name = "telefone_hash", length = 64, unique = true)
+    private String telefoneHash;
 
     @CreationTimestamp
     @Column(name = "data_cadastro", nullable = false, updatable = false)

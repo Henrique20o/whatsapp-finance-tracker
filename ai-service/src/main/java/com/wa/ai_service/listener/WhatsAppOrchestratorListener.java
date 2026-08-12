@@ -21,7 +21,7 @@ public class WhatsAppOrchestratorListener {
     public void processarMensagemDoWhatsApp(MensagemFilaDTO mensagemBruta) {
 
         if ("TEXTO".equalsIgnoreCase(mensagemBruta.tipoMidia())) {
-            System.out.println("Processando mensagem de: " + mensagemBruta.telefone());
+            System.out.println("Processando mensagem financeira recebida");
 
             TransacaoExtraidaDTO transacaoProcessada = llmCategorizerService.extrairTransacao(
                     mensagemBruta.telefone(),

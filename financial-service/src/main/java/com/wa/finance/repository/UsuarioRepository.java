@@ -6,6 +6,6 @@ import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
-    Optional<Usuario> findByTelefone(String telefone);
+    Optional<Usuario> findByTelefoneHash(String telefoneHash);
 
 }

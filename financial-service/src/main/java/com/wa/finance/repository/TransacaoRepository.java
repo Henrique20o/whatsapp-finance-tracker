@@ -14,31 +14,31 @@ import java.util.Optional;
 public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     Optional<Transacao> findByExternalMessageId(String externalMessageId);
 
-    Optional<Transacao> findByIdAndUsuarioTelefone(Long id, String telefone);
+    Optional<Transacao> findByIdAndUsuarioTelefoneHash(Long id, String telefoneHash);
 
     @Query("""
             select coalesce(sum(t.valor), 0)
             from Transacao t
-            where t.usuario.telefone = :telefone
+            where t.usuario.telefoneHash = :telefoneHash
               and t.deletado = false
               and t.dataHora >= :inicio
             """)
     BigDecimal somarGastosDesde(
-            @Param("telefone") String telefone,
+            @Param("telefoneHash") String telefoneHash,
             @Param("inicio") LocalDateTime inicio
     );
 
     @Query("""
             select new com.wa.finance.dto.GastoPorCategoriaDTO(t.categoria.nome, sum(t.valor))
             from Transacao t
-            where t.usuario.telefone = :telefone
+            where t.usuario.telefoneHash = :telefoneHash
               and t.deletado = false
               and t.dataHora >= :inicio
             group by t.categoria.nome
             order by sum(t.valor) desc
             """)
     List<GastoPorCategoriaDTO> somarGastosPorCategoriaDesde(
-            @Param("telefone") String telefone,
+            @Param("telefoneHash") String telefoneHash,
             @Param("inicio") LocalDateTime inicio
     );
 }
