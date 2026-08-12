@@ -23,4 +23,12 @@ class ConversationStateServiceTest {
         assertThat(service.consumirSeAguardandoGasto("5531888887777")).isFalse();
         assertThat(service.consumirSeAguardandoGasto("5531999998888")).isTrue();
     }
+
+    @Test
+    void deveConsumirEstadoDeCriacaoDeCategoriaUmaUnicaVez() {
+        service.aguardarNomeDaCategoria("5531999998888");
+
+        assertThat(service.consumirSeAguardandoNomeDaCategoria("5531999998888")).isTrue();
+        assertThat(service.consumirSeAguardandoNomeDaCategoria("5531999998888")).isFalse();
+    }
 }

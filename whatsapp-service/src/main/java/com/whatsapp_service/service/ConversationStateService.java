@@ -29,8 +29,32 @@ public class ConversationStateService {
                 && state.expiresAt().isAfter(Instant.now());
     }
 
+    public void aguardarNomeDaCategoria(String telefone) {
+        states.put(telefone, new ConversationState(
+                ConversationStep.AGUARDANDO_NOME_CATEGORIA,
+                Instant.now().plus(STATE_TTL)
+        ));
+    }
+
+    public boolean consumirSeAguardandoNomeDaCategoria(String telefone) {
+        ConversationState state = states.get(telefone);
+        if (state == null) {
+            return false;
+        }
+
+        if (state.step() != ConversationStep.AGUARDANDO_NOME_CATEGORIA
+                || !state.expiresAt().isAfter(Instant.now())) {
+            states.remove(telefone, state);
+            return false;
+        }
+
+        states.remove(telefone, state);
+        return true;
+    }
+
     enum ConversationStep {
-        AGUARDANDO_GASTO
+        AGUARDANDO_GASTO,
+        AGUARDANDO_NOME_CATEGORIA
     }
 
     record ConversationState(ConversationStep step, Instant expiresAt) {}

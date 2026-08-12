@@ -20,6 +20,8 @@ class WhatsAppActionResolverTest {
             "ver_relatorio, VER_RELATORIO",
             "Mais opções, MAIS_OPCOES",
             "gerenciar_categorias, GERENCIAR_CATEGORIAS",
+            "listar_categorias, LISTAR_CATEGORIAS",
+            "criar_categoria, CRIAR_CATEGORIA",
             "Ajuda, AJUDA",
             "voltar_menu, VOLTAR_MENU",
             "Gastei 50 reais, TEXTO_LIVRE"

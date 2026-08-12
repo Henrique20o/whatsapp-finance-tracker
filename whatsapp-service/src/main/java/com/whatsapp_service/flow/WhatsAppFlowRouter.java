@@ -32,16 +32,48 @@ public class WhatsAppFlowRouter {
     public void processar(String messageId, String telefone, String texto) {
         ResolvedWhatsAppAction resolved = actionResolver.resolver(texto);
 
+        if (resolved.action() == WhatsAppAction.TEXTO_LIVRE
+                && conversationStateService.consumirSeAguardandoNomeDaCategoria(telefone)) {
+            criarCategoria(telefone, texto);
+            return;
+        }
+
         switch (resolved.action()) {
             case ABRIR_MENU -> wuzApiClient.enviarMenuPrincipal(telefone);
             case REGISTRAR_GASTO -> iniciarRegistroDeGasto(telefone);
             case VER_RELATORIO -> enviarRelatorio(telefone);
             case MAIS_OPCOES -> wuzApiClient.enviarMenuMaisOpcoes(telefone);
-            case GERENCIAR_CATEGORIAS -> enviarCategorias(telefone);
+            case GERENCIAR_CATEGORIAS -> wuzApiClient.enviarMenuCategorias(telefone);
+            case LISTAR_CATEGORIAS -> enviarCategorias(telefone);
+            case CRIAR_CATEGORIA -> solicitarNomeDaCategoria(telefone);
             case AJUDA -> enviarAjuda(telefone);
             case VOLTAR_MENU -> wuzApiClient.enviarMenuPrincipal(telefone);
             case CANCELAR_TRANSACAO -> cancelarTransacao(telefone, resolved.transacaoId());
             case TEXTO_LIVRE -> encaminharTextoParaIa(messageId, telefone, texto);
+        }
+    }
+
+    private void solicitarNomeDaCategoria(String telefone) {
+        conversationStateService.aguardarNomeDaCategoria(telefone);
+        wuzApiClient.enviarMensagem(
+                telefone,
+                "Digite o nome da nova categoria. Exemplo: *Viagens*."
+        );
+    }
+
+    private void criarCategoria(String telefone, String nome) {
+        try {
+            String categoria = financialReportClient.criarCategoria(telefone, nome);
+            wuzApiClient.enviarMensagem(
+                    telefone,
+                    "✅ Categoria *" + categoria + "* criada com sucesso. Digite *menu* para voltar."
+            );
+        } catch (org.springframework.web.client.RestClientResponseException exception) {
+            log.warn("Categoria inválida para {}: status={}", telefone, exception.getStatusCode());
+            wuzApiClient.enviarMensagem(
+                    telefone,
+                    "Não foi possível criar a categoria. Use um nome entre 2 e 50 caracteres."
+            );
         }
     }
 

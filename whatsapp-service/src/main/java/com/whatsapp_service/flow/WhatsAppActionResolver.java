@@ -37,6 +37,10 @@ public class WhatsAppActionResolver {
                     ResolvedWhatsAppAction.of(WhatsAppAction.MAIS_OPCOES);
             case "gerenciar categorias", "gerenciar_categorias" ->
                     ResolvedWhatsAppAction.of(WhatsAppAction.GERENCIAR_CATEGORIAS);
+            case "listar categorias", "listar_categorias" ->
+                    ResolvedWhatsAppAction.of(WhatsAppAction.LISTAR_CATEGORIAS);
+            case "criar categoria", "criar_categoria" ->
+                    ResolvedWhatsAppAction.of(WhatsAppAction.CRIAR_CATEGORIA);
             case "ajuda" -> ResolvedWhatsAppAction.of(WhatsAppAction.AJUDA);
             case "voltar ao menu", "voltar_menu" ->
                     ResolvedWhatsAppAction.of(WhatsAppAction.VOLTAR_MENU);

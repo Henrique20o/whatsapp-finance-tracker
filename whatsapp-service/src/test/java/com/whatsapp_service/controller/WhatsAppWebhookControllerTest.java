@@ -305,7 +305,7 @@ class WhatsAppWebhookControllerTest {
         WuzapiWebhookPayload payload = payload("Message", """
                 {
                   "Info": {"ID": "message-categories", "Sender": "5531999998888@s.whatsapp.net"},
-                  "Message": {"templateButtonReplyMessage": {"selectedID": "gerenciar_categorias"}}
+                  "Message": {"templateButtonReplyMessage": {"selectedID": "listar_categorias"}}
                 }
                 """);
         when(financialReportClient.buscarCategorias("5531999998888"))
@@ -332,6 +332,29 @@ class WhatsAppWebhookControllerTest {
         controller.receberMensagem(payload);
 
         verify(wuzApiClient).enviarMenuPrincipal("5531999998888");
+        verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void deveCriarCategoriaEsperadaSemAcionarIa() throws Exception {
+        WuzapiWebhookPayload payload = payload("Message", """
+                {
+                  "Info": {"ID": "message-category-name", "Sender": "5531999998888@s.whatsapp.net"},
+                  "Message": {"conversation": "Viagens"}
+                }
+                """);
+        when(conversationStateService.consumirSeAguardandoNomeDaCategoria("5531999998888"))
+                .thenReturn(true);
+        when(financialReportClient.criarCategoria("5531999998888", "Viagens"))
+                .thenReturn("Viagens");
+
+        controller.receberMensagem(payload);
+
+        verify(financialReportClient).criarCategoria("5531999998888", "Viagens");
+        verify(wuzApiClient).enviarMensagem(
+                org.mockito.ArgumentMatchers.eq("5531999998888"),
+                org.mockito.ArgumentMatchers.contains("Viagens")
+        );
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
     }
 

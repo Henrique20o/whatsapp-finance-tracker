@@ -2,6 +2,7 @@ package com.whatsapp_service.client;
 
 import com.whatsapp_service.dto.ResumoFinanceiroDTO;
 import com.whatsapp_service.dto.CancelamentoTransacaoDTO;
+import com.whatsapp_service.dto.CategoriaRequestDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -49,5 +50,13 @@ public class FinancialReportClient {
                         .build())
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {});
+    }
+
+    public String criarCategoria(String telefone, String nome) {
+        return restClient.post()
+                .uri("/v1/categorias")
+                .body(new CategoriaRequestDTO(telefone, nome))
+                .retrieve()
+                .body(String.class);
     }
 }
