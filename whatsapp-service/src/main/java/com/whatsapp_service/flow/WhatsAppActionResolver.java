@@ -35,6 +35,11 @@ public class WhatsAppActionResolver {
                     ResolvedWhatsAppAction.of(WhatsAppAction.VER_RELATORIO);
             case "mais opcoes", "mais_opcoes" ->
                     ResolvedWhatsAppAction.of(WhatsAppAction.MAIS_OPCOES);
+            case "gerenciar categorias", "gerenciar_categorias" ->
+                    ResolvedWhatsAppAction.of(WhatsAppAction.GERENCIAR_CATEGORIAS);
+            case "ajuda" -> ResolvedWhatsAppAction.of(WhatsAppAction.AJUDA);
+            case "voltar ao menu", "voltar_menu" ->
+                    ResolvedWhatsAppAction.of(WhatsAppAction.VOLTAR_MENU);
             default -> ResolvedWhatsAppAction.of(WhatsAppAction.TEXTO_LIVRE);
         };
     }

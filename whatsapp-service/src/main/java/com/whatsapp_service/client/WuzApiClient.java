@@ -79,6 +79,33 @@ public class WuzApiClient {
         log.info("Menu principal enviado para {}", telefone);
     }
 
+    public void enviarMenuMaisOpcoes(String telefone) {
+        RestClient client = restClientBuilder
+                .baseUrl(url)
+                .build();
+
+        SendTemplateRequest menu = new SendTemplateRequest(
+                telefone,
+                "Escolha uma opção:",
+                "Mais opções",
+                "Controle Financeiro",
+                List.of(
+                        new SendTemplateRequest.Button("reply", "Gerenciar categorias", "gerenciar_categorias"),
+                        new SendTemplateRequest.Button("reply", "Ajuda", "ajuda"),
+                        new SendTemplateRequest.Button("reply", "Voltar ao menu", "voltar_menu")
+                )
+        );
+
+        client.post()
+                .uri("/chat/send/buttons")
+                .header("Token", token)
+                .body(menu)
+                .retrieve()
+                .toBodilessEntity();
+
+        log.info("Menu de opções enviado para {}", telefone);
+    }
+
     public void enviarImagem(String telefone, String legenda, String imagemBase64) {
         RestClient client = restClientBuilder
                 .baseUrl(url)

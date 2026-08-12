@@ -36,7 +36,10 @@ public class WhatsAppFlowRouter {
             case ABRIR_MENU -> wuzApiClient.enviarMenuPrincipal(telefone);
             case REGISTRAR_GASTO -> iniciarRegistroDeGasto(telefone);
             case VER_RELATORIO -> enviarRelatorio(telefone);
-            case MAIS_OPCOES -> informarMaisOpcoes(telefone);
+            case MAIS_OPCOES -> wuzApiClient.enviarMenuMaisOpcoes(telefone);
+            case GERENCIAR_CATEGORIAS -> enviarCategorias(telefone);
+            case AJUDA -> enviarAjuda(telefone);
+            case VOLTAR_MENU -> wuzApiClient.enviarMenuPrincipal(telefone);
             case CANCELAR_TRANSACAO -> cancelarTransacao(telefone, resolved.transacaoId());
             case TEXTO_LIVRE -> encaminharTextoParaIa(messageId, telefone, texto);
         }
@@ -86,10 +89,29 @@ public class WhatsAppFlowRouter {
         }
     }
 
-    private void informarMaisOpcoes(String telefone) {
+    private void enviarCategorias(String telefone) {
+        List<String> categorias = financialReportClient.buscarCategorias(telefone);
+        String lista = categorias == null || categorias.isEmpty()
+                ? "Nenhuma categoria ativa foi encontrada."
+                : categorias.stream()
+                        .map(categoria -> "• " + categoria)
+                        .collect(java.util.stream.Collectors.joining("\n"));
+
         wuzApiClient.enviarMensagem(
                 telefone,
-                "Essa opção estará disponível em breve. Digite menu para voltar."
+                "📂 *Suas categorias ativas*\n\n" + lista
+                        + "\n\nDigite *menu* para voltar."
+        );
+    }
+
+    private void enviarAjuda(String telefone) {
+        wuzApiClient.enviarMensagem(
+                telefone,
+                "❓ *Como usar*\n\n"
+                        + "• Use *Registrar gasto* e descreva o que comprou e o valor.\n"
+                        + "• Use *Ver relatório* para consultar totais e gastos por categoria.\n"
+                        + "• Após registrar um gasto, use o botão *Cancelar* para desfazê-lo.\n"
+                        + "• Digite *menu* a qualquer momento para abrir o menu principal."
         );
     }
 

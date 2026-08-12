@@ -19,6 +19,9 @@ class WhatsAppActionResolverTest {
             "Registrar gasto, REGISTRAR_GASTO",
             "ver_relatorio, VER_RELATORIO",
             "Mais opções, MAIS_OPCOES",
+            "gerenciar_categorias, GERENCIAR_CATEGORIAS",
+            "Ajuda, AJUDA",
+            "voltar_menu, VOLTAR_MENU",
             "Gastei 50 reais, TEXTO_LIVRE"
     })
     void deveResolverAcoesConhecidas(String texto, WhatsAppAction esperada) {

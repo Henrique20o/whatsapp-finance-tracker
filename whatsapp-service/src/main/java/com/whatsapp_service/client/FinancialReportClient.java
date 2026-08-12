@@ -3,8 +3,11 @@ package com.whatsapp_service.client;
 import com.whatsapp_service.dto.ResumoFinanceiroDTO;
 import com.whatsapp_service.dto.CancelamentoTransacaoDTO;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+
+import java.util.List;
 
 @Component
 public class FinancialReportClient {
@@ -36,5 +39,15 @@ public class FinancialReportClient {
                         .build(transacaoId))
                 .retrieve()
                 .body(CancelamentoTransacaoDTO.class);
+    }
+
+    public List<String> buscarCategorias(String telefone) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/v1/categorias")
+                        .queryParam("telefone", telefone)
+                        .build())
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
     }
 }

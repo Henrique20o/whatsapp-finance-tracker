@@ -285,6 +285,56 @@ class WhatsAppWebhookControllerTest {
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    void deveAbrirMenuDeMaisOpcoesSemAcionarIa() throws Exception {
+        WuzapiWebhookPayload payload = payload("Message", """
+                {
+                  "Info": {"ID": "message-more", "Sender": "5531999998888@s.whatsapp.net"},
+                  "Message": {"templateButtonReplyMessage": {"selectedID": "mais_opcoes"}}
+                }
+                """);
+
+        controller.receberMensagem(payload);
+
+        verify(wuzApiClient).enviarMenuMaisOpcoes("5531999998888");
+        verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void deveListarCategoriasSemAcionarIa() throws Exception {
+        WuzapiWebhookPayload payload = payload("Message", """
+                {
+                  "Info": {"ID": "message-categories", "Sender": "5531999998888@s.whatsapp.net"},
+                  "Message": {"templateButtonReplyMessage": {"selectedID": "gerenciar_categorias"}}
+                }
+                """);
+        when(financialReportClient.buscarCategorias("5531999998888"))
+                .thenReturn(List.of("Alimentação", "Lazer", "Outros"));
+
+        controller.receberMensagem(payload);
+
+        verify(wuzApiClient).enviarMensagem(
+                org.mockito.ArgumentMatchers.eq("5531999998888"),
+                org.mockito.ArgumentMatchers.contains("Lazer")
+        );
+        verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void deveVoltarAoMenuPrincipalSemAcionarIa() throws Exception {
+        WuzapiWebhookPayload payload = payload("Message", """
+                {
+                  "Info": {"ID": "message-back", "Sender": "5531999998888@s.whatsapp.net"},
+                  "Message": {"templateButtonReplyMessage": {"selectedID": "voltar_menu"}}
+                }
+                """);
+
+        controller.receberMensagem(payload);
+
+        verify(wuzApiClient).enviarMenuPrincipal("5531999998888");
+        verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
     private WuzapiWebhookPayload payload(String type, String eventJson) throws Exception {
         JsonNode event = objectMapper.readTree(eventJson);
         return new WuzapiWebhookPayload(type, event);
