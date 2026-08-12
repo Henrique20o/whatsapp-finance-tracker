@@ -17,40 +17,18 @@ public class WhatsAppResponseListener {
 
     @RabbitListener(queues = RabbitMQConfig.WHATSAPP_OUTPUT_QUEUE)
     public void processarReposta(RespostaFinanceiroDTO resposta) {
+        log.info("Mensagem financeira recebida para envio pelo WhatsApp");
 
-        log.info(
-                "Mensagem recebida da fila para o telefone {}",
-                resposta.telefone()
-        );
-
-        try {
-
-            if (resposta.transacaoIdCancelavel() != null) {
-                wuzapiClient.enviarConfirmacaoComCancelamento(
-                        resposta.telefone(),
-                        resposta.mensagem(),
-                        resposta.transacaoIdCancelavel()
-                );
-            } else {
-                wuzapiClient.enviarMensagem(
-                        resposta.telefone(),
-                        resposta.mensagem()
-                );
-            }
-
-            log.info(
-                    "Mensagem enviada com sucesso para {}",
-                    resposta.telefone()
-            );
-
-        } catch (Exception e) {
-
-            log.error(
-                    "Erro ao enviar mensagem para {}",
+        if (resposta.transacaoIdCancelavel() != null) {
+            wuzapiClient.enviarConfirmacaoComCancelamento(
                     resposta.telefone(),
-                    e
+                    resposta.mensagem(),
+                    resposta.transacaoIdCancelavel()
             );
-
+        } else {
+            wuzapiClient.enviarMensagem(resposta.telefone(), resposta.mensagem());
         }
+
+        log.info("Mensagem enviada com sucesso pelo WuzAPI");
     }
 }

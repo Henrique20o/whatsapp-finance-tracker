@@ -31,6 +31,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -124,6 +125,15 @@ class WhatsAppWebhookControllerTest {
 
         assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void devePropagarFalhaDePayloadAssinadoParaRetornarErroAoWuzapi() throws Exception {
+        byte[] rawBody = "{json-invalido".getBytes(StandardCharsets.UTF_8);
+
+        assertThatThrownBy(() -> controller.receberMensagem(assinar(rawBody), rawBody))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("500 INTERNAL_SERVER_ERROR");
     }
 
     @Test

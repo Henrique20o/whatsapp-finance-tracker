@@ -17,13 +17,8 @@ public class TransacaoListener {
 
     @RabbitListener(queues = RabbitMQConfig.TRANSACTION_QUEUE)
     public void processarTransacao(TransacaoRequestDTO dto) {
-        log.info("Mensagem recebida da fila para processamento financeiro");
-
-        try {
-            transacaoService.processarTransacaoDaFila(dto);
-            log.info("Transação salva no banco com sucesso via Mensageria!");
-        } catch (Exception e) {
-            log.error("Erro ao processar transação da fila: {}", e.getMessage());
-        }
+        log.info("Mensagem recebida para processamento financeiro");
+        transacaoService.processarTransacaoDaFila(dto);
+        log.info("Transação salva no banco com sucesso via mensageria");
     }
 }

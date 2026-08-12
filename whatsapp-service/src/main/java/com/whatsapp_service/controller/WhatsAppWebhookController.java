@@ -6,6 +6,7 @@ import com.whatsapp_service.security.WebhookSignatureVerifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -75,6 +76,11 @@ public class WhatsAppWebhookController {
             flowRouter.processar(messageId, telefone, texto);
         } catch (Exception e) {
             log.error("Erro ao processar webhook WuzAPI", e);
+            throw new ResponseStatusException(
+                    org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Falha ao processar webhook WuzAPI",
+                    e
+            );
         }
 
         return ResponseEntity.ok().build();
