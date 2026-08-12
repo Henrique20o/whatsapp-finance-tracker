@@ -358,6 +358,29 @@ class WhatsAppWebhookControllerTest {
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    void deveConfirmarDesativacaoSemAcionarIa() throws Exception {
+        WuzapiWebhookPayload payload = payload("Message", """
+                {
+                  "Info": {"ID": "message-disable-confirm", "Sender": "5531999998888@s.whatsapp.net"},
+                  "Message": {"templateButtonReplyMessage": {"selectedID": "confirmar_desativacao_categoria"}}
+                }
+                """);
+        when(conversationStateService.consumirCategoriaParaConfirmarDesativacao("5531999998888"))
+                .thenReturn("Viagens");
+        when(financialReportClient.desativarCategoria("5531999998888", "Viagens"))
+                .thenReturn("Viagens");
+
+        controller.receberMensagem(payload);
+
+        verify(financialReportClient).desativarCategoria("5531999998888", "Viagens");
+        verify(wuzApiClient).enviarMensagem(
+                org.mockito.ArgumentMatchers.eq("5531999998888"),
+                org.mockito.ArgumentMatchers.contains("desativada")
+        );
+        verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
     private WuzapiWebhookPayload payload(String type, String eventJson) throws Exception {
         JsonNode event = objectMapper.readTree(eventJson);
         return new WuzapiWebhookPayload(type, event);

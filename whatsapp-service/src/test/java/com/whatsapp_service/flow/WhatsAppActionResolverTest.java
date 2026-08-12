@@ -22,6 +22,9 @@ class WhatsAppActionResolverTest {
             "gerenciar_categorias, GERENCIAR_CATEGORIAS",
             "listar_categorias, LISTAR_CATEGORIAS",
             "criar_categoria, CRIAR_CATEGORIA",
+            "desativar_categoria, DESATIVAR_CATEGORIA",
+            "confirmar_desativacao_categoria, CONFIRMAR_DESATIVACAO_CATEGORIA",
+            "cancelar_fluxo, CANCELAR_FLUXO",
             "Ajuda, AJUDA",
             "voltar_menu, VOLTAR_MENU",
             "Gastei 50 reais, TEXTO_LIVRE"

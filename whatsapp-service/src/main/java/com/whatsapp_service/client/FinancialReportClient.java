@@ -59,4 +59,15 @@ public class FinancialReportClient {
                 .retrieve()
                 .body(String.class);
     }
+
+    public String desativarCategoria(String telefone, String nome) {
+        return restClient.delete()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/v1/categorias")
+                        .queryParam("telefone", telefone)
+                        .queryParam("nome", nome)
+                        .build())
+                .retrieve()
+                .body(String.class);
+    }
 }

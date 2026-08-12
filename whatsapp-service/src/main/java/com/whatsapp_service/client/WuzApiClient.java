@@ -116,6 +116,7 @@ public class WuzApiClient {
                 List.of(
                         new SendTemplateRequest.Button("reply", "Listar categorias", "listar_categorias"),
                         new SendTemplateRequest.Button("reply", "Criar categoria", "criar_categoria"),
+                        new SendTemplateRequest.Button("reply", "Desativar categoria", "desativar_categoria"),
                         new SendTemplateRequest.Button("reply", "Voltar ao menu", "voltar_menu")
                 )
         );
@@ -128,6 +129,33 @@ public class WuzApiClient {
                 .toBodilessEntity();
 
         log.info("Menu de categorias enviado para {}", telefone);
+    }
+
+    public void enviarConfirmacaoDesativacaoCategoria(String telefone, String categoria) {
+        RestClient client = restClientBuilder.baseUrl(url).build();
+        SendTemplateRequest confirmacao = new SendTemplateRequest(
+                telefone,
+                "Deseja realmente desativar a categoria *" + categoria + "*?",
+                "Confirmar desativação",
+                "As transações antigas serão preservadas",
+                List.of(
+                        new SendTemplateRequest.Button(
+                                "reply",
+                                "Confirmar",
+                                "confirmar_desativacao_categoria"
+                        ),
+                        new SendTemplateRequest.Button("reply", "Cancelar", "cancelar_fluxo")
+                )
+        );
+
+        client.post()
+                .uri("/chat/send/buttons")
+                .header("Token", token)
+                .body(confirmacao)
+                .retrieve()
+                .toBodilessEntity();
+
+        log.info("Confirmação de desativação de categoria enviada para {}", telefone);
     }
 
     public void enviarImagem(String telefone, String legenda, String imagemBase64) {

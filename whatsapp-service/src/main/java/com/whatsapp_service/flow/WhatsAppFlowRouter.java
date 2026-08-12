@@ -38,19 +38,33 @@ public class WhatsAppFlowRouter {
             return;
         }
 
+        if (resolved.action() == WhatsAppAction.TEXTO_LIVRE
+                && conversationStateService.estaAguardandoCategoriaParaDesativar(telefone)) {
+            prepararDesativacaoDeCategoria(telefone, texto);
+            return;
+        }
+
         switch (resolved.action()) {
-            case ABRIR_MENU -> wuzApiClient.enviarMenuPrincipal(telefone);
+            case ABRIR_MENU -> abrirMenuPrincipal(telefone);
             case REGISTRAR_GASTO -> iniciarRegistroDeGasto(telefone);
             case VER_RELATORIO -> enviarRelatorio(telefone);
             case MAIS_OPCOES -> wuzApiClient.enviarMenuMaisOpcoes(telefone);
             case GERENCIAR_CATEGORIAS -> wuzApiClient.enviarMenuCategorias(telefone);
             case LISTAR_CATEGORIAS -> enviarCategorias(telefone);
             case CRIAR_CATEGORIA -> solicitarNomeDaCategoria(telefone);
+            case DESATIVAR_CATEGORIA -> solicitarCategoriaParaDesativar(telefone);
+            case CONFIRMAR_DESATIVACAO_CATEGORIA -> confirmarDesativacaoDeCategoria(telefone);
+            case CANCELAR_FLUXO -> cancelarFluxo(telefone);
             case AJUDA -> enviarAjuda(telefone);
-            case VOLTAR_MENU -> wuzApiClient.enviarMenuPrincipal(telefone);
+            case VOLTAR_MENU -> abrirMenuPrincipal(telefone);
             case CANCELAR_TRANSACAO -> cancelarTransacao(telefone, resolved.transacaoId());
             case TEXTO_LIVRE -> encaminharTextoParaIa(messageId, telefone, texto);
         }
+    }
+
+    private void abrirMenuPrincipal(String telefone) {
+        conversationStateService.cancelarFluxo(telefone);
+        wuzApiClient.enviarMenuPrincipal(telefone);
     }
 
     private void solicitarNomeDaCategoria(String telefone) {
@@ -75,6 +89,68 @@ public class WhatsAppFlowRouter {
                     "Não foi possível criar a categoria. Use um nome entre 2 e 50 caracteres."
             );
         }
+    }
+
+    private void solicitarCategoriaParaDesativar(String telefone) {
+        List<String> categorias = financialReportClient.buscarCategorias(telefone).stream()
+                .filter(categoria -> !"Outros".equalsIgnoreCase(categoria))
+                .toList();
+
+        if (categorias.isEmpty()) {
+            wuzApiClient.enviarMensagem(telefone, "Não há categorias disponíveis para desativar.");
+            return;
+        }
+
+        conversationStateService.aguardarCategoriaParaDesativar(telefone);
+        String lista = categorias.stream()
+                .map(categoria -> "• " + categoria)
+                .collect(java.util.stream.Collectors.joining("\n"));
+        wuzApiClient.enviarMensagem(
+                telefone,
+                "Digite exatamente o nome da categoria que deseja desativar:\n\n" + lista
+        );
+    }
+
+    private void prepararDesativacaoDeCategoria(String telefone, String nomeInformado) {
+        String categoria = financialReportClient.buscarCategorias(telefone).stream()
+                .filter(nome -> nome.equalsIgnoreCase(nomeInformado.trim()))
+                .findFirst()
+                .orElse(null);
+
+        if (categoria == null || "Outros".equalsIgnoreCase(categoria)) {
+            wuzApiClient.enviarMensagem(
+                    telefone,
+                    "Categoria inválida ou protegida. Digite outro nome da lista ou *menu* para sair."
+            );
+            return;
+        }
+
+        conversationStateService.aguardarConfirmacaoDeDesativacao(telefone, categoria);
+        wuzApiClient.enviarConfirmacaoDesativacaoCategoria(telefone, categoria);
+    }
+
+    private void confirmarDesativacaoDeCategoria(String telefone) {
+        String categoria = conversationStateService.consumirCategoriaParaConfirmarDesativacao(telefone);
+        if (categoria == null) {
+            wuzApiClient.enviarMensagem(telefone, "Essa confirmação expirou. Inicie novamente pelo menu.");
+            return;
+        }
+
+        try {
+            String desativada = financialReportClient.desativarCategoria(telefone, categoria);
+            wuzApiClient.enviarMensagem(
+                    telefone,
+                    "✅ Categoria *" + desativada + "* desativada. As transações antigas foram preservadas."
+            );
+        } catch (org.springframework.web.client.RestClientResponseException exception) {
+            log.warn("Falha ao desativar categoria de {}: status={}", telefone, exception.getStatusCode());
+            wuzApiClient.enviarMensagem(telefone, "Não foi possível desativar essa categoria.");
+        }
+    }
+
+    private void cancelarFluxo(String telefone) {
+        conversationStateService.cancelarFluxo(telefone);
+        wuzApiClient.enviarMensagem(telefone, "Operação cancelada. Digite *menu* para voltar.");
     }
 
     private void iniciarRegistroDeGasto(String telefone) {

@@ -41,6 +41,12 @@ public class WhatsAppActionResolver {
                     ResolvedWhatsAppAction.of(WhatsAppAction.LISTAR_CATEGORIAS);
             case "criar categoria", "criar_categoria" ->
                     ResolvedWhatsAppAction.of(WhatsAppAction.CRIAR_CATEGORIA);
+            case "desativar categoria", "desativar_categoria" ->
+                    ResolvedWhatsAppAction.of(WhatsAppAction.DESATIVAR_CATEGORIA);
+            case "confirmar desativacao", "confirmar_desativacao_categoria" ->
+                    ResolvedWhatsAppAction.of(WhatsAppAction.CONFIRMAR_DESATIVACAO_CATEGORIA);
+            case "cancelar operacao", "cancelar_fluxo" ->
+                    ResolvedWhatsAppAction.of(WhatsAppAction.CANCELAR_FLUXO);
             case "ajuda" -> ResolvedWhatsAppAction.of(WhatsAppAction.AJUDA);
             case "voltar ao menu", "voltar_menu" ->
                     ResolvedWhatsAppAction.of(WhatsAppAction.VOLTAR_MENU);

@@ -45,4 +45,29 @@ public class CategoriaService {
         categoria.setAtiva(true);
         return categoriaRepository.save(categoria).getNome();
     }
+
+    @Transactional
+    public String desativar(String telefone, String nomeInformado) {
+        Usuario usuario = usuarioService.buscarOuCriarUsuarioPorTelefone(telefone);
+        Categoria categoria = categoriaRepository
+                .findByNomeIgnoreCaseAndUsuarioId(nomeInformado.trim(), usuario.getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Categoria não encontrada"
+                ));
+
+        if ("Outros".equalsIgnoreCase(categoria.getNome())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "A categoria Outros não pode ser desativada"
+            );
+        }
+
+        if (!categoria.getAtiva()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "A categoria já está desativada");
+        }
+
+        categoria.setAtiva(false);
+        return categoriaRepository.save(categoria).getNome();
+    }
 }

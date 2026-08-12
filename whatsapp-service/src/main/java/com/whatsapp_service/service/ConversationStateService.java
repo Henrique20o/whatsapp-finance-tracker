@@ -17,7 +17,8 @@ public class ConversationStateService {
     public void aguardarRegistroDeGasto(String telefone) {
         states.put(telefone, new ConversationState(
                 ConversationStep.AGUARDANDO_GASTO,
-                Instant.now().plus(STATE_TTL)
+                Instant.now().plus(STATE_TTL),
+                null
         ));
     }
 
@@ -32,7 +33,8 @@ public class ConversationStateService {
     public void aguardarNomeDaCategoria(String telefone) {
         states.put(telefone, new ConversationState(
                 ConversationStep.AGUARDANDO_NOME_CATEGORIA,
-                Instant.now().plus(STATE_TTL)
+                Instant.now().plus(STATE_TTL),
+                null
         ));
     }
 
@@ -44,7 +46,9 @@ public class ConversationStateService {
 
         if (state.step() != ConversationStep.AGUARDANDO_NOME_CATEGORIA
                 || !state.expiresAt().isAfter(Instant.now())) {
-            states.remove(telefone, state);
+            if (!state.expiresAt().isAfter(Instant.now())) {
+                states.remove(telefone, state);
+            }
             return false;
         }
 
@@ -52,10 +56,63 @@ public class ConversationStateService {
         return true;
     }
 
-    enum ConversationStep {
-        AGUARDANDO_GASTO,
-        AGUARDANDO_NOME_CATEGORIA
+    public void aguardarCategoriaParaDesativar(String telefone) {
+        states.put(telefone, new ConversationState(
+                ConversationStep.AGUARDANDO_CATEGORIA_PARA_DESATIVAR,
+                Instant.now().plus(STATE_TTL),
+                null
+        ));
     }
 
-    record ConversationState(ConversationStep step, Instant expiresAt) {}
+    public boolean estaAguardandoCategoriaParaDesativar(String telefone) {
+        return consultarPasso(telefone, ConversationStep.AGUARDANDO_CATEGORIA_PARA_DESATIVAR) != null;
+    }
+
+    public void aguardarConfirmacaoDeDesativacao(String telefone, String categoria) {
+        states.put(telefone, new ConversationState(
+                ConversationStep.AGUARDANDO_CONFIRMACAO_DESATIVACAO,
+                Instant.now().plus(STATE_TTL),
+                categoria
+        ));
+    }
+
+    public String consumirCategoriaParaConfirmarDesativacao(String telefone) {
+        ConversationState state = consumirPasso(
+                telefone,
+                ConversationStep.AGUARDANDO_CONFIRMACAO_DESATIVACAO
+        );
+        return state == null ? null : state.contexto();
+    }
+
+    public void cancelarFluxo(String telefone) {
+        states.remove(telefone);
+    }
+
+    private ConversationState consumirPasso(String telefone, ConversationStep passo) {
+        ConversationState state = consultarPasso(telefone, passo);
+        if (state != null) {
+            states.remove(telefone, state);
+        }
+        return state;
+    }
+
+    private ConversationState consultarPasso(String telefone, ConversationStep passo) {
+        ConversationState state = states.get(telefone);
+        if (state == null || state.step() != passo || !state.expiresAt().isAfter(Instant.now())) {
+            if (state != null && !state.expiresAt().isAfter(Instant.now())) {
+                states.remove(telefone, state);
+            }
+            return null;
+        }
+        return state;
+    }
+
+    enum ConversationStep {
+        AGUARDANDO_GASTO,
+        AGUARDANDO_NOME_CATEGORIA,
+        AGUARDANDO_CATEGORIA_PARA_DESATIVAR,
+        AGUARDANDO_CONFIRMACAO_DESATIVACAO
+    }
+
+    record ConversationState(ConversationStep step, Instant expiresAt, String contexto) {}
 }
