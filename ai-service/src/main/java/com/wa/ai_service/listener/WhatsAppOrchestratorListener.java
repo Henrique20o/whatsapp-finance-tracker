@@ -6,12 +6,14 @@ import com.wa.ai_service.dto.TransacaoExtraidaDTO;
 import com.wa.ai_service.dto.TransacaoRequestDTO;
 import com.wa.ai_service.service.LlmCategorizerService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class WhatsAppOrchestratorListener {
 
     private final LlmCategorizerService llmCategorizerService;
@@ -21,7 +23,7 @@ public class WhatsAppOrchestratorListener {
     public void processarMensagemDoWhatsApp(MensagemFilaDTO mensagemBruta) {
 
         if ("TEXTO".equalsIgnoreCase(mensagemBruta.tipoMidia())) {
-            System.out.println("Processando mensagem financeira recebida");
+            log.info("Processando mensagem financeira recebida: messageId={}", mensagemBruta.messageId());
 
             TransacaoExtraidaDTO transacaoProcessada = llmCategorizerService.extrairTransacao(
                     mensagemBruta.telefone(),
@@ -36,7 +38,8 @@ public class WhatsAppOrchestratorListener {
                     transacaoProcessada.categoriaNome()
             );
 
-            System.out.println("IA extraiu com sucesso: " + transacaoProcessada.descricao());
+            log.info("Extração concluída: messageId={}, categoria={}",
+                    mensagemBruta.messageId(), transacaoProcessada.categoriaNome());
 
             rabbitTemplate.convertAndSend(RabbitMQConfig.TRANSACTION_QUEUE, transacaoComMessageId);
         }

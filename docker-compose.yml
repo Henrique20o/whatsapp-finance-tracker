@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASS}
       TZ: America/Sao_Paulo
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,8 +27,8 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -42,7 +42,7 @@ services:
     image: asternic/wuzapi:latest
     container_name: wuzapi
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       - WUZAPI_ADMIN_TOKEN=${WUZAPI_ADMIN_TOKEN:?Defina WUZAPI_ADMIN_TOKEN no arquivo .env}
       - WUZAPI_GLOBAL_HMAC_KEY=${WUZAPI_HMAC_KEY:?Defina WUZAPI_HMAC_KEY no arquivo .env}
@@ -56,8 +56,8 @@ services:
   whatsapp-service:
     build: ./whatsapp-service
     container_name: whatsapp-service
-    ports:
-      - "8082:8080"
+    expose:
+      - "8080"
     environment:
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
@@ -66,6 +66,7 @@ services:
       - AUTHENTICATION_API_KEY=${AUTHENTICATION_API_KEY}
       - WUZAPI_HMAC_KEY=${WUZAPI_HMAC_KEY:?Defina WUZAPI_HMAC_KEY no arquivo .env}
       - APP_FINANCIAL_SERVICE_URL=http://financial-service:8080
+      - FINANCIAL_SERVICE_API_KEY=${FINANCIAL_SERVICE_API_KEY:?Defina FINANCIAL_SERVICE_API_KEY no arquivo .env}
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -75,13 +76,14 @@ services:
   ai-service:
     build: ./ai-service
     container_name: ai-service
-    ports:
-      - "8083:8080"
+    expose:
+      - "8080"
     environment:
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS}
       - APP_FINANCIAL_SERVICE_URL=http://financial-service:8080
+      - FINANCIAL_SERVICE_API_KEY=${FINANCIAL_SERVICE_API_KEY:?Defina FINANCIAL_SERVICE_API_KEY no arquivo .env}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       rabbitmq:
@@ -92,8 +94,8 @@ services:
   financial-service:
     build: ./financial-service
     container_name: financial-service
-    ports:
-      - "8084:8080"
+    expose:
+      - "8080"
     environment:
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
@@ -102,6 +104,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=${DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASS}
       - PHONE_ENCRYPTION_KEY=${PHONE_ENCRYPTION_KEY:?Defina PHONE_ENCRYPTION_KEY no arquivo .env}
+      - FINANCIAL_SERVICE_API_KEY=${FINANCIAL_SERVICE_API_KEY:?Defina FINANCIAL_SERVICE_API_KEY no arquivo .env}
     depends_on:
       rabbitmq:
         condition: service_healthy

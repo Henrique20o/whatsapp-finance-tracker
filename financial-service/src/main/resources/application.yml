@@ -37,3 +37,4 @@ management:
 app:
   security:
     phone-key: ${PHONE_ENCRYPTION_KEY}
+    internal-api-key: ${FINANCIAL_SERVICE_API_KEY}

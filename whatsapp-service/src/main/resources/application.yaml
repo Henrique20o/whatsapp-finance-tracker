@@ -18,6 +18,7 @@ app:
     wuzapi-hmac-key: ${WUZAPI_HMAC_KEY}
   financial-service:
     url: ${APP_FINANCIAL_SERVICE_URL:http://financial-service:8080}
+    api-key: ${FINANCIAL_SERVICE_API_KEY}
 
 management:
   endpoints:

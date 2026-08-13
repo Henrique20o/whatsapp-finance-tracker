@@ -13,13 +13,19 @@ import java.util.List;
 @Component
 public class FinancialReportClient {
 
+    private static final String INTERNAL_API_KEY_HEADER = "X-Internal-Api-Key";
+
     private final RestClient restClient;
 
     public FinancialReportClient(
             RestClient.Builder builder,
-            @Value("${app.financial-service.url}") String financialServiceUrl
+            @Value("${app.financial-service.url}") String financialServiceUrl,
+            @Value("${app.financial-service.api-key}") String apiKey
     ) {
-        this.restClient = builder.baseUrl(financialServiceUrl).build();
+        this.restClient = builder
+                .baseUrl(financialServiceUrl)
+                .defaultHeader(INTERNAL_API_KEY_HEADER, apiKey)
+                .build();
     }
 
     public ResumoFinanceiroDTO buscarResumo(String telefone) {

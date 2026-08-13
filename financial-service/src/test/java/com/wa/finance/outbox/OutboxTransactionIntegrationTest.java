@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(properties = {
         "app.security.phone-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "app.security.internal-api-key=chave-interna-financeiro-de-teste-123456",
         "spring.flyway.enabled=false",
         "spring.datasource.url=jdbc:h2:mem:outbox-transaction;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa",

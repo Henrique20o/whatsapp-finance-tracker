@@ -22,6 +22,7 @@ spring:
 app:
   financial-service:
     url: ${APP_FINANCIAL_SERVICE_URL:http://localhost:8084}
+    api-key: ${FINANCIAL_SERVICE_API_KEY}
 
 management:
   endpoints:

@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -79,7 +80,7 @@ class TransacaoServiceTest {
         when(transacaoRepository.findByExternalMessageId(dto.messageId())).thenReturn(Optional.empty());
         when(usuarioService.buscarOuCriarUsuarioPorTelefone(dto.telefone())).thenReturn(usuario);
         when(usuarioService.obterTelefone(usuario)).thenReturn(dto.telefone());
-        when(categoriaRepository.findByNomeIgnoreCaseAndUsuarioId(dto.categoriaNome(), usuario.getId()))
+        when(categoriaRepository.findByNomeIgnoreCaseAndUsuarioIdAndAtivaTrue(dto.categoriaNome(), usuario.getId()))
                 .thenReturn(Optional.of(categoria));
         when(transacaoRepository.saveAndFlush(any(Transacao.class)))
                 .thenAnswer(invocation -> {
@@ -114,7 +115,7 @@ class TransacaoServiceTest {
         when(transacaoRepository.findByExternalMessageId(dto.messageId())).thenReturn(Optional.empty());
         when(usuarioService.buscarOuCriarUsuarioPorTelefone(dto.telefone())).thenReturn(usuario);
         when(usuarioService.obterTelefone(usuario)).thenReturn(dto.telefone());
-        when(categoriaRepository.findByNomeIgnoreCaseAndUsuarioId(dto.categoriaNome(), usuario.getId()))
+        when(categoriaRepository.findByNomeIgnoreCaseAndUsuarioIdAndAtivaTrue(dto.categoriaNome(), usuario.getId()))
                 .thenReturn(Optional.of(categoria));
         when(transacaoRepository.saveAndFlush(any(Transacao.class)))
                 .thenAnswer(invocation -> {
@@ -167,6 +168,49 @@ class TransacaoServiceTest {
 
         assertThat(resultado.canceladaAgora()).isFalse();
         verify(transacaoRepository, never()).save(any());
+    }
+
+    @Test
+    void deveRejeitarCategoriaInexistenteSemCriarCategoriaOuTransacao() {
+        TransacaoRequestDTO dto = novaRequisicao("categoria-inexistente");
+        Usuario usuario = Usuario.builder().id(1L).telefone(dto.telefone()).build();
+
+        when(transacaoRepository.findByExternalMessageId(dto.messageId())).thenReturn(Optional.empty());
+        when(usuarioService.buscarOuCriarUsuarioPorTelefone(dto.telefone())).thenReturn(usuario);
+        when(categoriaRepository.findByNomeIgnoreCaseAndUsuarioIdAndAtivaTrue(dto.categoriaNome(), usuario.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> transacaoService.processarTransacaoDaFila(dto))
+                .hasMessageContaining("categoria informada não existe ou está desativada");
+
+        verify(categoriaRepository, never()).save(any());
+        verify(transacaoRepository, never()).saveAndFlush(any());
+        verify(outboxService, never()).adicionarConfirmacao(any());
+    }
+
+    @Test
+    void deveRejeitarValorNaoPositivoAntesDeConsultarUsuario() {
+        TransacaoRequestDTO dto = new TransacaoRequestDTO(
+                "valor-invalido", "5531999998888", BigDecimal.ZERO, "Futebol", "Lazer"
+        );
+
+        assertThatThrownBy(() -> transacaoService.processarTransacaoDaFila(dto))
+                .hasMessageContaining("valor deve ser maior que zero");
+
+        verify(usuarioService, never()).buscarOuCriarUsuarioPorTelefone(any());
+        verify(transacaoRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void deveRejeitarDescricaoEmBrancoAntesDeConsultarUsuario() {
+        TransacaoRequestDTO dto = new TransacaoRequestDTO(
+                "descricao-invalida", "5531999998888", new BigDecimal("10.00"), "   ", "Lazer"
+        );
+
+        assertThatThrownBy(() -> transacaoService.processarTransacaoDaFila(dto))
+                .hasMessageContaining("descrição é obrigatória");
+
+        verify(usuarioService, never()).buscarOuCriarUsuarioPorTelefone(any());
     }
 
     private TransacaoRequestDTO novaRequisicao(String messageId) {

@@ -83,7 +83,7 @@ public class WhatsAppFlowRouter {
                     "✅ Categoria *" + categoria + "* criada com sucesso. Digite *menu* para voltar."
             );
         } catch (org.springframework.web.client.RestClientResponseException exception) {
-            log.warn("Categoria inválida para {}: status={}", telefone, exception.getStatusCode());
+            log.warn("Categoria inválida: status={}", exception.getStatusCode());
             wuzApiClient.enviarMensagem(
                     telefone,
                     "Não foi possível criar a categoria. Use um nome entre 2 e 50 caracteres."
@@ -143,7 +143,7 @@ public class WhatsAppFlowRouter {
                     "✅ Categoria *" + desativada + "* desativada. As transações antigas foram preservadas."
             );
         } catch (org.springframework.web.client.RestClientResponseException exception) {
-            log.warn("Falha ao desativar categoria de {}: status={}", telefone, exception.getStatusCode());
+            log.warn("Falha ao desativar categoria: status={}", exception.getStatusCode());
             wuzApiClient.enviarMensagem(telefone, "Não foi possível desativar essa categoria.");
         }
     }
@@ -231,7 +231,7 @@ public class WhatsAppFlowRouter {
                 "TEXTO",
                 texto
         ));
-        log.info("Mensagem enviada para fila. Telefone: {}", telefone);
+        log.info("Mensagem enviada para fila: messageId={}", messageId);
     }
 
     private NumberFormat criarFormatadorDeMoeda() {

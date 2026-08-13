@@ -46,10 +46,7 @@ public class WuzApiClient {
                 .toBodilessEntity();
 
 
-        log.info(
-                "Mensagem enviada para {}",
-                telefone
-        );
+        log.info("Mensagem enviada pelo WuzAPI");
     }
 
     public void enviarMenuPrincipal(String telefone) {
@@ -76,7 +73,7 @@ public class WuzApiClient {
                 .retrieve()
                 .toBodilessEntity();
 
-        log.info("Menu principal enviado para {}", telefone);
+        log.info("Menu principal enviado pelo WuzAPI");
     }
 
     public void enviarMenuMaisOpcoes(String telefone) {
@@ -103,7 +100,7 @@ public class WuzApiClient {
                 .retrieve()
                 .toBodilessEntity();
 
-        log.info("Menu de opções enviado para {}", telefone);
+        log.info("Menu de opções enviado pelo WuzAPI");
     }
 
     public void enviarMenuCategorias(String telefone) {
@@ -128,7 +125,7 @@ public class WuzApiClient {
                 .retrieve()
                 .toBodilessEntity();
 
-        log.info("Menu de categorias enviado para {}", telefone);
+        log.info("Menu de categorias enviado pelo WuzAPI");
     }
 
     public void enviarConfirmacaoDesativacaoCategoria(String telefone, String categoria) {
@@ -155,7 +152,7 @@ public class WuzApiClient {
                 .retrieve()
                 .toBodilessEntity();
 
-        log.info("Confirmação de desativação de categoria enviada para {}", telefone);
+        log.info("Confirmação de desativação de categoria enviada pelo WuzAPI");
     }
 
     public void enviarImagem(String telefone, String legenda, String imagemBase64) {
@@ -170,7 +167,7 @@ public class WuzApiClient {
                 .retrieve()
                 .toBodilessEntity();
 
-        log.info("Imagem enviada para {}", telefone);
+        log.info("Imagem enviada pelo WuzAPI");
     }
 
     public void enviarConfirmacaoComCancelamento(
@@ -201,6 +198,6 @@ public class WuzApiClient {
                 .retrieve()
                 .toBodilessEntity();
 
-        log.info("Confirmação cancelável enviada para {}", telefone);
+        log.info("Confirmação cancelável enviada pelo WuzAPI");
     }
 }

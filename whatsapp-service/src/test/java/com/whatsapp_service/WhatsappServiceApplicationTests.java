@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 		"wuzapi.token=test-token",
 		"app.security.wuzapi-hmac-key=chave-hmac-de-teste-com-32-caracteres",
 		"app.financial-service.url=http://localhost:8084",
+		"app.financial-service.api-key=chave-interna-financeiro-de-teste-123456",
 		"spring.rabbitmq.listener.simple.auto-startup=false"
 })
 class WhatsappServiceApplicationTests {

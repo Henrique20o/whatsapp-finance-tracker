@@ -9,6 +9,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LlmCategorizerServiceTest {
 
+    @Test
+    void promptDeveRestringirClassificacaoAoCatalogoAtivo() {
+        assertThat(LlmCategorizerService.SYSTEM_PROMPT)
+                .contains("Nunca crie, sugira, renomeie ou adapte uma categoria")
+                .contains("criação de categorias pertence a outro fluxo")
+                .contains("Contas domésticas")
+                .doesNotContain("VocÃ")
+                .doesNotContain("Moradia");
+    }
+
     private static final List<String> CATEGORIAS = List.of(
             "Alimenta\u00e7\u00e3o",
             "Transporte",
