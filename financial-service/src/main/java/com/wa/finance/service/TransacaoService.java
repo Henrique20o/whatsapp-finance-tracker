@@ -7,7 +7,7 @@ import com.wa.finance.dto.RespostaUsuarioDTO;
 import com.wa.finance.dto.TransacaoRequestDTO;
 import com.wa.finance.dto.CancelamentoTransacaoDTO;
 import com.wa.finance.dto.TransacaoResponseDTO;
-import com.wa.finance.producer.WhatsAppResponseProducer;
+import com.wa.finance.outbox.OutboxService;
 import com.wa.finance.repository.CategoriaRepository;
 import com.wa.finance.repository.TransacaoRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,7 @@ public class TransacaoService {
     private final TransacaoRepository transacaoRepository;
     private final CategoriaRepository categoriaRepository;
     private final UsuarioService usuarioService;
-    private final WhatsAppResponseProducer responseProducer;
+    private final OutboxService outboxService;
     private final PhoneProtectionService phoneProtectionService;
 
     @Transactional
@@ -68,7 +68,7 @@ public class TransacaoService {
 
         transacaoRepository.saveAndFlush(transacao);
 
-        responseProducer.enviar(
+        outboxService.adicionarConfirmacao(
                 new RespostaUsuarioDTO(
                         usuarioService.obterTelefone(usuario),
                         String.format(

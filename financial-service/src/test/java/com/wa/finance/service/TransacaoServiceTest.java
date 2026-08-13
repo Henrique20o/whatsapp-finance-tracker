@@ -3,9 +3,9 @@ package com.wa.finance.service;
 import com.wa.finance.domain.Categoria;
 import com.wa.finance.domain.Transacao;
 import com.wa.finance.domain.Usuario;
-import com.wa.finance.dto.RespostaUsuarioDTO;
 import com.wa.finance.dto.TransacaoRequestDTO;
-import com.wa.finance.producer.WhatsAppResponseProducer;
+import com.wa.finance.dto.RespostaUsuarioDTO;
+import com.wa.finance.outbox.OutboxService;
 import com.wa.finance.repository.CategoriaRepository;
 import com.wa.finance.repository.TransacaoRepository;
 import com.wa.finance.security.PhoneProtectionService;
@@ -38,7 +38,7 @@ class TransacaoServiceTest {
     private UsuarioService usuarioService;
 
     @Mock
-    private WhatsAppResponseProducer responseProducer;
+    private OutboxService outboxService;
 
     @Mock
     private PhoneProtectionService phoneProtectionService;
@@ -62,7 +62,7 @@ class TransacaoServiceTest {
         assertThat(resultado).isSameAs(existente);
         verify(usuarioService, never()).buscarOuCriarUsuarioPorTelefone(any());
         verify(transacaoRepository, never()).saveAndFlush(any());
-        verify(responseProducer, never()).enviar(any());
+        verify(outboxService, never()).adicionarConfirmacao(any());
     }
 
     @Test
@@ -95,7 +95,7 @@ class TransacaoServiceTest {
         assertThat(resultado.getCategoria()).isSameAs(categoria);
 
         ArgumentCaptor<RespostaUsuarioDTO> resposta = ArgumentCaptor.forClass(RespostaUsuarioDTO.class);
-        verify(responseProducer).enviar(resposta.capture());
+        verify(outboxService).adicionarConfirmacao(resposta.capture());
         assertThat(resposta.getValue().telefone()).isEqualTo(dto.telefone());
         assertThat(resposta.getValue().transacaoIdCancelavel()).isEqualTo(99L);
     }
