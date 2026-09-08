@@ -4,6 +4,7 @@ import com.whatsapp_service.dto.ResumoFinanceiroDTO;
 import com.whatsapp_service.dto.CancelamentoTransacaoDTO;
 import com.whatsapp_service.dto.CategoriaRequestDTO;
 import com.whatsapp_service.dto.RelatorioPeriodoDTO;
+import com.whatsapp_service.dto.DetalheCategoriaDTO;
 import java.time.LocalDate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -54,6 +55,27 @@ public class FinancialReportClient {
                         .build())
                 .retrieve()
                 .body(RelatorioPeriodoDTO.class);
+    }
+
+    public DetalheCategoriaDTO buscarDetalheDaCategoria(
+            String telefone,
+            Long categoriaId,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            int pagina
+    ) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/v1/relatorios/categoria")
+                        .queryParam("telefone", telefone)
+                        .queryParam("categoriaId", categoriaId)
+                        .queryParam("dataInicio", dataInicio)
+                        .queryParam("dataFim", dataFim)
+                        .queryParam("pagina", pagina)
+                        .queryParam("tamanho", 10)
+                        .build())
+                .retrieve()
+                .body(DetalheCategoriaDTO.class);
     }
 
     public CancelamentoTransacaoDTO cancelarTransacao(Long transacaoId, String telefone) {

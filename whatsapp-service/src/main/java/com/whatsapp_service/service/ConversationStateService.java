@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class ConversationStateService {
@@ -13,6 +15,7 @@ public class ConversationStateService {
     private static final Duration STATE_TTL = Duration.ofMinutes(10);
 
     private final Map<String, ConversationState> states = new ConcurrentHashMap<>();
+    private final Map<String, ReportContext> reportContexts = new ConcurrentHashMap<>();
 
     public void aguardarRegistroDeGasto(String telefone) {
         states.put(telefone, new ConversationState(
@@ -86,6 +89,65 @@ public class ConversationStateService {
 
     public void cancelarFluxo(String telefone) {
         states.remove(telefone);
+        reportContexts.remove(telefone);
+    }
+
+    public void armazenarContextoRelatorio(
+            String telefone,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            String tituloPeriodo,
+            List<ReportCategoryOption> categorias
+    ) {
+        reportContexts.put(telefone, new ReportContext(
+                dataInicio,
+                dataFim,
+                tituloPeriodo,
+                List.copyOf(categorias),
+                Instant.now().plus(STATE_TTL)
+        ));
+    }
+
+    public List<ReportCategoryOption> buscarCategoriasDoRelatorio(String telefone) {
+        ReportContext context = consultarContextoRelatorio(telefone);
+        return context == null ? List.of() : context.categorias();
+    }
+
+    public ReportCategorySelection selecionarCategoriaDoRelatorio(String telefone, long categoriaId) {
+        ReportContext context = consultarContextoRelatorio(telefone);
+        if (context == null) {
+            return null;
+        }
+        return context.categorias().stream()
+                .filter(categoria -> categoria.id() == categoriaId)
+                .findFirst()
+                .map(categoria -> new ReportCategorySelection(
+                        context.dataInicio(),
+                        context.dataFim(),
+                        categoria.id(),
+                        categoria.nome()
+                ))
+                .orElse(null);
+    }
+
+    public ReportPeriod buscarPeriodoDoRelatorio(String telefone) {
+        ReportContext context = consultarContextoRelatorio(telefone);
+        return context == null
+                ? null
+                : new ReportPeriod(
+                        context.dataInicio(), context.dataFim(), context.tituloPeriodo());
+    }
+
+    private ReportContext consultarContextoRelatorio(String telefone) {
+        ReportContext context = reportContexts.get(telefone);
+        if (context == null) {
+            return null;
+        }
+        if (!context.expiresAt().isAfter(Instant.now())) {
+            reportContexts.remove(telefone, context);
+            return null;
+        }
+        return context;
     }
 
     private ConversationState consumirPasso(String telefone, ConversationStep passo) {
@@ -115,4 +177,27 @@ public class ConversationStateService {
     }
 
     record ConversationState(ConversationStep step, Instant expiresAt, String contexto) {}
+
+    record ReportContext(
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            String tituloPeriodo,
+            List<ReportCategoryOption> categorias,
+            Instant expiresAt
+    ) {}
+
+    public record ReportCategorySelection(
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            long categoriaId,
+            String categoria
+    ) {}
+
+    public record ReportCategoryOption(long id, String nome) {}
+
+    public record ReportPeriod(
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            String tituloPeriodo
+    ) {}
 }

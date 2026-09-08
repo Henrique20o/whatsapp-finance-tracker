@@ -7,6 +7,8 @@ import com.whatsapp_service.dto.ResumoFinanceiroDTO;
 import com.whatsapp_service.dto.GastoPorCategoriaDTO;
 import com.whatsapp_service.dto.CancelamentoTransacaoDTO;
 import com.whatsapp_service.dto.RelatorioPeriodoDTO;
+import com.whatsapp_service.dto.DetalheCategoriaDTO;
+import com.whatsapp_service.dto.TransacaoRelatorioDTO;
 import com.whatsapp_service.dto.WuzapiWebhookPayload;
 import com.whatsapp_service.producer.WhatsAppQueueProducer;
 import com.whatsapp_service.service.ConversationStateService;
@@ -29,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.HexFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -311,7 +314,7 @@ class WhatsAppWebhookControllerTest {
                 .thenReturn(new RelatorioPeriodoDTO(
                         LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31),
                         new BigDecimal("620.90"),
-                        List.of(new GastoPorCategoriaDTO("Alimentação", new BigDecimal("620.90")))
+                        List.of(new GastoPorCategoriaDTO(1L, "Alimentação", new BigDecimal("620.90")))
                 ));
         when(pieChartService.gerarGraficoBase64(org.mockito.ArgumentMatchers.anyList()))
                 .thenReturn("data:image/png;base64,imagem");
@@ -325,6 +328,68 @@ class WhatsAppWebhookControllerTest {
         verify(wuzApiClient).enviarImagem(
                 "5531999998888", "Gastos por categoria — Julho de 2026", "data:image/png;base64,imagem");
         verify(wuzApiClient).enviarNavegacaoMensal("5531999998888", YearMonth.of(2026, 7));
+        verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void deveAbrirCategoriasDoUltimoRelatorioSemAcionarIa() throws Exception {
+        WuzapiWebhookPayload payload = payload("Message", """
+                {
+                  "Info": {"ID": "message-explore", "Sender": "5531999998888@s.whatsapp.net"},
+                  "Message": {"buttonsResponseMessage": {"selectedButtonId": "explorar_categorias_relatorio"}}
+                }
+                """);
+        var categorias = List.of(
+                new ConversationStateService.ReportCategoryOption(1L, "Alimentação"),
+                new ConversationStateService.ReportCategoryOption(2L, "Lazer")
+        );
+        when(conversationStateService.buscarCategoriasDoRelatorio("5531999998888"))
+                .thenReturn(categorias);
+
+        receber(payload);
+
+        verify(wuzApiClient).enviarSelecaoCategoriasRelatorio("5531999998888", categorias);
+        verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void deveDetalharCategoriaPaginadaSemAcionarIa() throws Exception {
+        WuzapiWebhookPayload payload = payload("Message", """
+                {
+                  "Info": {"ID": "message-detail", "Sender": "5531999998888@s.whatsapp.net"},
+                  "Message": {"buttonsResponseMessage": {"selectedButtonId": "detalhar_categoria_2_0"}}
+                }
+                """);
+        LocalDate inicio = LocalDate.of(2026, 7, 1);
+        LocalDate fim = LocalDate.of(2026, 7, 31);
+        when(conversationStateService.selecionarCategoriaDoRelatorio("5531999998888", 2L))
+                .thenReturn(new ConversationStateService.ReportCategorySelection(
+                        inicio, fim, 2L, "Lazer"));
+        when(financialReportClient.buscarDetalheDaCategoria(
+                "5531999998888", 2L, inicio, fim, 0))
+                .thenReturn(new DetalheCategoriaDTO(
+                        inicio,
+                        fim,
+                        "Lazer",
+                        new BigDecimal("50.00"),
+                        1,
+                        0,
+                        1,
+                        List.of(new TransacaoRelatorioDTO(
+                                42L,
+                                new BigDecimal("50.00"),
+                                "Jogo de futebol",
+                                LocalDateTime.of(2026, 7, 12, 20, 30)
+                        ))
+                ));
+
+        receber(payload);
+
+        verify(wuzApiClient).enviarMensagem(
+                org.mockito.ArgumentMatchers.eq("5531999998888"),
+                org.mockito.ArgumentMatchers.contains("Jogo de futebol")
+        );
+        verify(wuzApiClient).enviarNavegacaoDetalheCategoria("5531999998888", 2L, 0, 1);
         verify(producer, never()).enviarParaProcessamento(org.mockito.ArgumentMatchers.any());
     }
 

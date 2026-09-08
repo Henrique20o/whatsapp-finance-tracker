@@ -13,6 +13,7 @@ import java.util.List;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import com.whatsapp_service.service.ConversationStateService.ReportCategoryOption;
 
 @Slf4j
 @Component
@@ -132,7 +133,11 @@ public class WuzApiClient {
         if (mes.isBefore(YearMonth.now(java.time.ZoneId.of("America/Sao_Paulo")))) {
             botoes.add(new SendTemplateRequest.Button("reply", "Próximo mês →", "relatorio_mes_" + mes.plusMonths(1)));
         }
-        botoes.add(new SendTemplateRequest.Button("reply", "Voltar ao menu", "voltar_menu"));
+        botoes.add(new SendTemplateRequest.Button(
+                "reply", "Explorar categorias", "explorar_categorias_relatorio"));
+        if (botoes.size() < 3) {
+            botoes.add(new SendTemplateRequest.Button("reply", "Voltar ao menu", "voltar_menu"));
+        }
         SendTemplateRequest menu = new SendTemplateRequest(
                 telefone,
                 "Navegue entre os meses ou volte ao menu.",
@@ -143,6 +148,99 @@ public class WuzApiClient {
 
         client.post().uri("/chat/send/buttons").header("Token", token).body(menu).retrieve().toBodilessEntity();
         log.info("Navegação mensal enviada pelo WuzAPI");
+    }
+
+    public void enviarAcoesRelatorio(String telefone) {
+        enviarBotoes(
+                telefone,
+                "Deseja aprofundar este relatório?",
+                "Detalhes do relatório",
+                "O período fica disponível por 10 minutos",
+                List.of(
+                        new SendTemplateRequest.Button(
+                                "reply", "Explorar categorias", "explorar_categorias_relatorio"),
+                        new SendTemplateRequest.Button(
+                                "reply", "Escolher período", "ver_relatorio"),
+                        new SendTemplateRequest.Button("reply", "Voltar ao menu", "voltar_menu")
+                )
+        );
+    }
+
+    public void enviarSelecaoCategoriasRelatorio(
+            String telefone,
+            List<ReportCategoryOption> categorias
+    ) {
+        for (int inicio = 0; inicio < categorias.size(); inicio += 3) {
+            int fim = Math.min(inicio + 3, categorias.size());
+            List<SendTemplateRequest.Button> botoes = new java.util.ArrayList<>();
+            for (int indice = inicio; indice < fim; indice++) {
+                botoes.add(new SendTemplateRequest.Button(
+                        "reply",
+                        abreviar(categorias.get(indice).nome(), 24),
+                        "detalhar_categoria_" + categorias.get(indice).id() + "_0"
+                ));
+            }
+
+            enviarBotoes(
+                    telefone,
+                    "Escolha uma categoria com gastos no período:",
+                    categorias.size() > 3
+                            ? "Categorias " + (inicio + 1) + "–" + fim
+                            : "Categorias do relatório",
+                    "Digite menu para sair",
+                    botoes
+            );
+        }
+        log.info("Seleção de categorias do relatório enviada pelo WuzAPI");
+    }
+
+    public void enviarNavegacaoDetalheCategoria(
+            String telefone,
+            long categoriaId,
+            int pagina,
+            int totalPaginas
+    ) {
+        List<SendTemplateRequest.Button> botoes = new java.util.ArrayList<>();
+        if (pagina > 0) {
+            botoes.add(new SendTemplateRequest.Button(
+                    "reply", "← Anteriores", "detalhar_categoria_" + categoriaId + "_" + (pagina - 1)));
+        }
+        if (pagina + 1 < totalPaginas) {
+            botoes.add(new SendTemplateRequest.Button(
+                    "reply", "Próximas →", "detalhar_categoria_" + categoriaId + "_" + (pagina + 1)));
+        }
+        botoes.add(new SendTemplateRequest.Button(
+                "reply", "Voltar ao resumo", "voltar_resumo_relatorio"));
+
+        enviarBotoes(
+                telefone,
+                "Navegue pelas transações ou escolha outra categoria.",
+                "Detalhes da categoria",
+                "Página " + (pagina + 1) + " de " + Math.max(totalPaginas, 1),
+                botoes
+        );
+    }
+
+    private void enviarBotoes(
+            String telefone,
+            String conteudo,
+            String titulo,
+            String rodape,
+            List<SendTemplateRequest.Button> botoes
+    ) {
+        RestClient client = restClientBuilder.baseUrl(url).build();
+        SendTemplateRequest menu = new SendTemplateRequest(
+                telefone, conteudo, titulo, rodape, botoes);
+        client.post()
+                .uri("/chat/send/buttons")
+                .header("Token", token)
+                .body(menu)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    private String abreviar(String texto, int limite) {
+        return texto.length() <= limite ? texto : texto.substring(0, limite - 1) + "…";
     }
 
     private String capitalizar(String texto) {

@@ -4,6 +4,8 @@ import com.wa.finance.domain.Transacao;
 import com.wa.finance.dto.GastoPorCategoriaDTO;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
@@ -29,12 +31,12 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     );
 
     @Query("""
-            select new com.wa.finance.dto.GastoPorCategoriaDTO(t.categoria.nome, sum(t.valor))
+            select new com.wa.finance.dto.GastoPorCategoriaDTO(t.categoria.id, t.categoria.nome, sum(t.valor))
             from Transacao t
             where t.usuario.telefoneHash = :telefoneHash
               and t.deletado = false
               and t.dataHora >= :inicio
-            group by t.categoria.nome
+            group by t.categoria.id, t.categoria.nome
             order by sum(t.valor) desc
             """)
     List<GastoPorCategoriaDTO> somarGastosPorCategoriaDesde(
@@ -57,17 +59,51 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     );
 
     @Query("""
-            select new com.wa.finance.dto.GastoPorCategoriaDTO(t.categoria.nome, sum(t.valor))
+            select new com.wa.finance.dto.GastoPorCategoriaDTO(t.categoria.id, t.categoria.nome, sum(t.valor))
             from Transacao t
             where t.usuario.telefoneHash = :telefoneHash
               and t.deletado = false
               and t.dataHora >= :inicio
               and t.dataHora < :fimExclusivo
-            group by t.categoria.nome
+            group by t.categoria.id, t.categoria.nome
             order by sum(t.valor) desc
             """)
     List<GastoPorCategoriaDTO> somarGastosPorCategoriaNoPeriodo(
             @Param("telefoneHash") String telefoneHash,
+            @Param("inicio") LocalDateTime inicio,
+            @Param("fimExclusivo") LocalDateTime fimExclusivo
+    );
+
+    @Query("""
+            select t
+            from Transacao t
+            where t.usuario.telefoneHash = :telefoneHash
+              and t.deletado = false
+              and t.categoria.id = :categoriaId
+              and t.dataHora >= :inicio
+              and t.dataHora < :fimExclusivo
+            order by t.dataHora desc, t.id desc
+            """)
+    Page<Transacao> buscarPorCategoriaNoPeriodo(
+            @Param("telefoneHash") String telefoneHash,
+            @Param("categoriaId") Long categoriaId,
+            @Param("inicio") LocalDateTime inicio,
+            @Param("fimExclusivo") LocalDateTime fimExclusivo,
+            Pageable pageable
+    );
+
+    @Query("""
+            select coalesce(sum(t.valor), 0)
+            from Transacao t
+            where t.usuario.telefoneHash = :telefoneHash
+              and t.deletado = false
+              and t.categoria.id = :categoriaId
+              and t.dataHora >= :inicio
+              and t.dataHora < :fimExclusivo
+            """)
+    BigDecimal somarCategoriaNoPeriodo(
+            @Param("telefoneHash") String telefoneHash,
+            @Param("categoriaId") Long categoriaId,
             @Param("inicio") LocalDateTime inicio,
             @Param("fimExclusivo") LocalDateTime fimExclusivo
     );

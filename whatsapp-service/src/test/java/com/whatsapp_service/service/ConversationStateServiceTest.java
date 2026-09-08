@@ -3,6 +3,8 @@ package com.whatsapp_service.service;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import java.time.LocalDate;
+import java.util.List;
 
 class ConversationStateServiceTest {
 
@@ -58,5 +60,48 @@ class ConversationStateServiceTest {
         service.cancelarFluxo("5531999998888");
 
         assertThat(service.estaAguardandoCategoriaParaDesativar("5531999998888")).isFalse();
+    }
+
+    @Test
+    void deveGuardarPeriodoECategoriaDoRelatorio() {
+        String telefone = "5531999998888";
+        LocalDate inicio = LocalDate.of(2026, 7, 1);
+        LocalDate fim = LocalDate.of(2026, 7, 31);
+        service.armazenarContextoRelatorio(
+                telefone,
+                inicio,
+                fim,
+                "Julho de 2026",
+                List.of(
+                        new ConversationStateService.ReportCategoryOption(1L, "Alimentação"),
+                        new ConversationStateService.ReportCategoryOption(2L, "Lazer")
+                )
+        );
+
+        var selecao = service.selecionarCategoriaDoRelatorio(telefone, 2L);
+
+        assertThat(selecao).isNotNull();
+        assertThat(selecao.categoria()).isEqualTo("Lazer");
+        assertThat(selecao.dataInicio()).isEqualTo(inicio);
+        assertThat(selecao.dataFim()).isEqualTo(fim);
+        assertThat(service.selecionarCategoriaDoRelatorio(telefone, 3L)).isNull();
+        assertThat(service.buscarPeriodoDoRelatorio(telefone).tituloPeriodo())
+                .isEqualTo("Julho de 2026");
+    }
+
+    @Test
+    void abrirMenuDeveRemoverContextoDoRelatorio() {
+        String telefone = "5531999998888";
+        service.armazenarContextoRelatorio(
+                telefone,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31),
+                "Julho de 2026",
+                List.of(new ConversationStateService.ReportCategoryOption(2L, "Lazer"))
+        );
+
+        service.cancelarFluxo(telefone);
+
+        assertThat(service.buscarCategoriasDoRelatorio(telefone)).isEmpty();
     }
 }

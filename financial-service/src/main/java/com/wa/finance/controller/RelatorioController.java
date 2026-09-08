@@ -2,6 +2,7 @@ package com.wa.finance.controller;
 
 import com.wa.finance.dto.ResumoFinanceiroDTO;
 import com.wa.finance.dto.RelatorioPeriodoDTO;
+import com.wa.finance.dto.DetalheCategoriaDTO;
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
 import com.wa.finance.service.RelatorioService;
@@ -31,5 +32,18 @@ public class RelatorioController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim
     ) {
         return ResponseEntity.ok(relatorioService.gerarRelatorioPorPeriodo(telefone, dataInicio, dataFim));
+    }
+
+    @GetMapping("/categoria")
+    public ResponseEntity<DetalheCategoriaDTO> obterDetalheDaCategoria(
+            @RequestParam String telefone,
+            @RequestParam Long categoriaId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "10") int tamanho
+    ) {
+        return ResponseEntity.ok(relatorioService.detalharCategoria(
+                telefone, categoriaId, dataInicio, dataFim, pagina, tamanho));
     }
 }

@@ -17,8 +17,8 @@ class PieChartServiceTest {
     @Test
     void deveGerarImagemPngEmBase64() {
         String imagem = service.gerarGraficoBase64(List.of(
-                new GastoPorCategoriaDTO("Alimentação", new BigDecimal("400.00")),
-                new GastoPorCategoriaDTO("Lazer", new BigDecimal("220.90"))
+                new GastoPorCategoriaDTO(1L, "Alimentação", new BigDecimal("400.00")),
+                new GastoPorCategoriaDTO(2L, "Lazer", new BigDecimal("220.90"))
         ));
 
         assertThat(imagem).startsWith("data:image/png;base64,");

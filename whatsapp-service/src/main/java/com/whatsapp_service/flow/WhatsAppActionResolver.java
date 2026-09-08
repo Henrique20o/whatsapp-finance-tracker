@@ -11,6 +11,7 @@ public class WhatsAppActionResolver {
 
     private static final String CANCEL_PREFIX = "cancelar_transacao_";
     private static final String MONTH_REPORT_PREFIX = "relatorio_mes_";
+    private static final String CATEGORY_DETAIL_PREFIX = "detalhar_categoria_";
     private static final Set<String> MENU_COMMANDS = Set.of(
             "oi", "ola", "menu", "inicio", "comecar"
     );
@@ -33,6 +34,13 @@ public class WhatsAppActionResolver {
             );
         }
 
+        if (comando.startsWith(CATEGORY_DETAIL_PREFIX)) {
+            return ResolvedWhatsAppAction.withParameter(
+                    WhatsAppAction.DETALHAR_CATEGORIA_RELATORIO,
+                    comando.substring(CATEGORY_DETAIL_PREFIX.length())
+            );
+        }
+
         if (MENU_COMMANDS.contains(comando)) {
             return ResolvedWhatsAppAction.of(WhatsAppAction.ABRIR_MENU);
         }
@@ -46,6 +54,10 @@ public class WhatsAppActionResolver {
                     ResolvedWhatsAppAction.of(WhatsAppAction.RELATORIO_SETE_DIAS);
             case "relatorio 30 dias", "relatorio_30_dias" ->
                     ResolvedWhatsAppAction.of(WhatsAppAction.RELATORIO_TRINTA_DIAS);
+            case "explorar categorias", "explorar_categorias_relatorio" ->
+                    ResolvedWhatsAppAction.of(WhatsAppAction.EXPLORAR_CATEGORIAS_RELATORIO);
+            case "voltar ao resumo", "voltar_resumo_relatorio" ->
+                    ResolvedWhatsAppAction.of(WhatsAppAction.VOLTAR_RESUMO_RELATORIO);
             case "mais opcoes", "mais_opcoes" ->
                     ResolvedWhatsAppAction.of(WhatsAppAction.MAIS_OPCOES);
             case "gerenciar categorias", "gerenciar_categorias" ->

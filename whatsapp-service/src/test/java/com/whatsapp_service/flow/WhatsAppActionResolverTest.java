@@ -20,6 +20,8 @@ class WhatsAppActionResolverTest {
             "ver_relatorio, VER_RELATORIO",
             "relatorio_7_dias, RELATORIO_SETE_DIAS",
             "relatorio_30_dias, RELATORIO_TRINTA_DIAS",
+            "explorar_categorias_relatorio, EXPLORAR_CATEGORIAS_RELATORIO",
+            "voltar_resumo_relatorio, VOLTAR_RESUMO_RELATORIO",
             "Mais opções, MAIS_OPCOES",
             "gerenciar_categorias, GERENCIAR_CATEGORIAS",
             "listar_categorias, LISTAR_CATEGORIAS",
@@ -49,6 +51,14 @@ class WhatsAppActionResolverTest {
 
         assertThat(resultado.action()).isEqualTo(WhatsAppAction.RELATORIO_MENSAL);
         assertThat(resultado.parametro()).isEqualTo("2026-07");
+    }
+
+    @Test
+    void deveExtrairCategoriaEPaginaDoDetalhamento() {
+        ResolvedWhatsAppAction resultado = resolver.resolver("detalhar_categoria_2_3");
+
+        assertThat(resultado.action()).isEqualTo(WhatsAppAction.DETALHAR_CATEGORIA_RELATORIO);
+        assertThat(resultado.parametro()).isEqualTo("2_3");
     }
 
     @Test

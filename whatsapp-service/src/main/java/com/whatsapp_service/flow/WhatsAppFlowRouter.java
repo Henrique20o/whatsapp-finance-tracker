@@ -4,6 +4,8 @@ import com.whatsapp_service.client.FinancialReportClient;
 import com.whatsapp_service.client.WuzApiClient;
 import com.whatsapp_service.dto.GastoPorCategoriaDTO;
 import com.whatsapp_service.dto.MensagemFilaDTO;
+import com.whatsapp_service.dto.TransacaoRelatorioDTO;
+import com.whatsapp_service.service.ConversationStateService.ReportCategoryOption;
 import com.whatsapp_service.producer.WhatsAppQueueProducer;
 import com.whatsapp_service.service.ConversationStateService;
 import com.whatsapp_service.service.PieChartService;
@@ -58,6 +60,10 @@ public class WhatsAppFlowRouter {
             case RELATORIO_SETE_DIAS -> enviarRelatorioDosUltimosDias(telefone, 7);
             case RELATORIO_TRINTA_DIAS -> enviarRelatorioDosUltimosDias(telefone, 30);
             case RELATORIO_MENSAL -> enviarRelatorioMensal(telefone, resolved.parametro());
+            case EXPLORAR_CATEGORIAS_RELATORIO -> explorarCategoriasDoRelatorio(telefone);
+            case DETALHAR_CATEGORIA_RELATORIO -> detalharCategoriaDoRelatorio(
+                    telefone, resolved.parametro());
+            case VOLTAR_RESUMO_RELATORIO -> voltarAoResumoDoRelatorio(telefone);
             case MAIS_OPCOES -> wuzApiClient.enviarMenuMaisOpcoes(telefone);
             case GERENCIAR_CATEGORIAS -> wuzApiClient.enviarMenuCategorias(telefone);
             case LISTAR_CATEGORIAS -> enviarCategorias(telefone);
@@ -187,6 +193,7 @@ public class WhatsAppFlowRouter {
         LocalDate fim = LocalDate.now(BUSINESS_ZONE);
         LocalDate inicio = fim.minusDays(dias - 1L);
         enviarRelatorioDoPeriodo(telefone, inicio, fim, "Últimos " + dias + " dias");
+        wuzApiClient.enviarAcoesRelatorio(telefone);
     }
 
     private void enviarRelatorioMensal(String telefone, String referencia) {
@@ -235,6 +242,131 @@ public class WhatsAppFlowRouter {
                     pieChartService.gerarGraficoBase64(gastos)
             );
         }
+
+        conversationStateService.armazenarContextoRelatorio(
+                telefone,
+                inicio,
+                fim,
+                tituloPeriodo,
+                gastos.stream()
+                        .map(gasto -> new ReportCategoryOption(
+                                gasto.categoriaId(), gasto.categoria()))
+                        .toList()
+        );
+    }
+
+    private void explorarCategoriasDoRelatorio(String telefone) {
+        List<ReportCategoryOption> categorias =
+                conversationStateService.buscarCategoriasDoRelatorio(telefone);
+        if (categorias.isEmpty()) {
+            wuzApiClient.enviarMensagem(
+                    telefone,
+                    "O relatório expirou ou não possui categorias com gastos. Gere um novo relatório."
+            );
+            return;
+        }
+        wuzApiClient.enviarSelecaoCategoriasRelatorio(telefone, categorias);
+    }
+
+    private void detalharCategoriaDoRelatorio(String telefone, String parametro) {
+        long[] navegacao = extrairNavegacaoDaCategoria(parametro);
+        if (navegacao == null) {
+            wuzApiClient.enviarMensagem(telefone, "Não foi possível identificar a categoria selecionada.");
+            return;
+        }
+
+        var selecao = conversationStateService.selecionarCategoriaDoRelatorio(
+                telefone, navegacao[0]);
+        if (selecao == null) {
+            wuzApiClient.enviarMensagem(
+                    telefone,
+                    "Essa seleção expirou. Gere o relatório novamente para explorar as categorias."
+            );
+            return;
+        }
+
+        var detalhe = financialReportClient.buscarDetalheDaCategoria(
+                telefone,
+                selecao.categoriaId(),
+                selecao.dataInicio(),
+                selecao.dataFim(),
+                Math.toIntExact(navegacao[1])
+        );
+        NumberFormat moeda = criarFormatadorDeMoeda();
+        DateTimeFormatter dataHora = DateTimeFormatter.ofPattern("dd/MM 'às' HH:mm");
+        String transacoes = detalhe.transacoes() == null || detalhe.transacoes().isEmpty()
+                ? "Nenhuma transação encontrada."
+                : detalhe.transacoes().stream()
+                        .map(item -> formatarTransacao(item, moeda, dataHora))
+                        .collect(java.util.stream.Collectors.joining("\n\n"));
+
+        wuzApiClient.enviarMensagem(
+                telefone,
+                "🔎 *" + detalhe.categoria() + "*\n"
+                        + detalhe.dataInicio().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                        + " a "
+                        + detalhe.dataFim().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                        + "\n\nTotal: " + moeda.format(detalhe.total())
+                        + "\nTransações: " + detalhe.quantidade()
+                        + "\nPágina " + (detalhe.pagina() + 1)
+                        + " de " + Math.max(detalhe.totalPaginas(), 1)
+                        + "\n\n" + transacoes
+        );
+        wuzApiClient.enviarNavegacaoDetalheCategoria(
+                telefone,
+                selecao.categoriaId(),
+                detalhe.pagina(),
+                detalhe.totalPaginas()
+        );
+    }
+
+    private void voltarAoResumoDoRelatorio(String telefone) {
+        var periodo = conversationStateService.buscarPeriodoDoRelatorio(telefone);
+        if (periodo == null) {
+            wuzApiClient.enviarMensagem(
+                    telefone,
+                    "Esse relatório expirou. Gere um novo relatório para continuar."
+            );
+            return;
+        }
+        enviarRelatorioDoPeriodo(
+                telefone,
+                periodo.dataInicio(),
+                periodo.dataFim(),
+                periodo.tituloPeriodo()
+        );
+        wuzApiClient.enviarAcoesRelatorio(telefone);
+    }
+
+    private long[] extrairNavegacaoDaCategoria(String parametro) {
+        try {
+            String[] partes = parametro.split("_");
+            if (partes.length != 2) {
+                return null;
+            }
+            long categoriaId = Long.parseLong(partes[0]);
+            long pagina = Long.parseLong(partes[1]);
+            return categoriaId <= 0 || pagina < 0 || pagina > Integer.MAX_VALUE
+                    ? null
+                    : new long[]{categoriaId, pagina};
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    private String formatarTransacao(
+            TransacaoRelatorioDTO transacao,
+            NumberFormat moeda,
+            DateTimeFormatter dataHora
+    ) {
+        String descricao = transacao.descricao() == null ? "Sem descrição" : transacao.descricao();
+        if (descricao.length() > 80) {
+            descricao = descricao.substring(0, 79) + "…";
+        }
+        String data = transacao.dataHora() == null
+                ? "Data não informada"
+                : transacao.dataHora().format(dataHora);
+        return "• " + data + " — " + moeda.format(transacao.valor()) + "\n  " + descricao;
     }
 
     private void enviarCategorias(String telefone) {
