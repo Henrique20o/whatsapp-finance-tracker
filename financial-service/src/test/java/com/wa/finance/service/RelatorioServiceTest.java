@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,5 +59,28 @@ class RelatorioServiceTest {
         verify(transacaoRepository, org.mockito.Mockito.times(2))
                 .somarGastosDesde(org.mockito.ArgumentMatchers.eq(telefoneHash), inicios.capture());
         assertThat(inicios.getAllValues().get(0)).isAfter(inicios.getAllValues().get(1));
+    }
+
+    @Test
+    void deveGerarRelatorioComIntervaloFechadoAberto() {
+        String telefone = "5531999998888";
+        String telefoneHash = "hash-telefone";
+        LocalDate inicio = LocalDate.of(2026, 7, 1);
+        LocalDate fim = LocalDate.of(2026, 7, 31);
+        when(phoneProtectionService.lookupHash(telefone)).thenReturn(telefoneHash);
+        when(transacaoRepository.somarGastosNoPeriodo(
+                telefoneHash, inicio.atStartOfDay(), fim.plusDays(1).atStartOfDay()))
+                .thenReturn(new BigDecimal("620.90"));
+        when(transacaoRepository.somarGastosPorCategoriaNoPeriodo(
+                telefoneHash, inicio.atStartOfDay(), fim.plusDays(1).atStartOfDay()))
+                .thenReturn(List.of(new GastoPorCategoriaDTO("Lazer", new BigDecimal("620.90"))));
+
+        var relatorio = relatorioService.gerarRelatorioPorPeriodo(telefone, inicio, fim);
+
+        assertThat(relatorio.dataInicio()).isEqualTo(inicio);
+        assertThat(relatorio.dataFim()).isEqualTo(fim);
+        assertThat(relatorio.total()).isEqualByComparingTo("620.90");
+        assertThat(relatorio.gastosPorCategoria()).extracting(GastoPorCategoriaDTO::categoria)
+                .containsExactly("Lazer");
     }
 }

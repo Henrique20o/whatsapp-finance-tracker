@@ -10,6 +10,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 @Slf4j
 @Component
@@ -101,6 +104,49 @@ public class WuzApiClient {
                 .toBodilessEntity();
 
         log.info("Menu de opções enviado pelo WuzAPI");
+    }
+
+    public void enviarMenuPeriodoRelatorio(String telefone, YearMonth mesAtual) {
+        RestClient client = restClientBuilder.baseUrl(url).build();
+        String mes = mesAtual.format(DateTimeFormatter.ofPattern("MMMM 'de' yyyy", Locale.of("pt", "BR")));
+        SendTemplateRequest menu = new SendTemplateRequest(
+                telefone,
+                "Qual período você deseja consultar?",
+                "Relatório financeiro",
+                "Escolha uma opção",
+                List.of(
+                        new SendTemplateRequest.Button("reply", "Últimos 7 dias", "relatorio_7_dias"),
+                        new SendTemplateRequest.Button("reply", "Últimos 30 dias", "relatorio_30_dias"),
+                        new SendTemplateRequest.Button("reply", capitalizar(mes), "relatorio_mes_" + mesAtual)
+                )
+        );
+
+        client.post().uri("/chat/send/buttons").header("Token", token).body(menu).retrieve().toBodilessEntity();
+        log.info("Menu de período do relatório enviado pelo WuzAPI");
+    }
+
+    public void enviarNavegacaoMensal(String telefone, YearMonth mes) {
+        RestClient client = restClientBuilder.baseUrl(url).build();
+        List<SendTemplateRequest.Button> botoes = new java.util.ArrayList<>();
+        botoes.add(new SendTemplateRequest.Button("reply", "← Mês anterior", "relatorio_mes_" + mes.minusMonths(1)));
+        if (mes.isBefore(YearMonth.now(java.time.ZoneId.of("America/Sao_Paulo")))) {
+            botoes.add(new SendTemplateRequest.Button("reply", "Próximo mês →", "relatorio_mes_" + mes.plusMonths(1)));
+        }
+        botoes.add(new SendTemplateRequest.Button("reply", "Voltar ao menu", "voltar_menu"));
+        SendTemplateRequest menu = new SendTemplateRequest(
+                telefone,
+                "Navegue entre os meses ou volte ao menu.",
+                "Período do relatório",
+                mes.toString(),
+                botoes
+        );
+
+        client.post().uri("/chat/send/buttons").header("Token", token).body(menu).retrieve().toBodilessEntity();
+        log.info("Navegação mensal enviada pelo WuzAPI");
+    }
+
+    private String capitalizar(String texto) {
+        return texto.isEmpty() ? texto : Character.toUpperCase(texto.charAt(0)) + texto.substring(1);
     }
 
     public void enviarMenuCategorias(String telefone) {

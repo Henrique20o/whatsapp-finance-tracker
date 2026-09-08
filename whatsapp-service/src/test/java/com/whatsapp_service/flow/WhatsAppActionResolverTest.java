@@ -18,6 +18,8 @@ class WhatsAppActionResolverTest {
             "registrar_gasto, REGISTRAR_GASTO",
             "Registrar gasto, REGISTRAR_GASTO",
             "ver_relatorio, VER_RELATORIO",
+            "relatorio_7_dias, RELATORIO_SETE_DIAS",
+            "relatorio_30_dias, RELATORIO_TRINTA_DIAS",
             "Mais opções, MAIS_OPCOES",
             "gerenciar_categorias, GERENCIAR_CATEGORIAS",
             "listar_categorias, LISTAR_CATEGORIAS",
@@ -39,6 +41,14 @@ class WhatsAppActionResolverTest {
 
         assertThat(resultado.action()).isEqualTo(WhatsAppAction.CANCELAR_TRANSACAO);
         assertThat(resultado.transacaoId()).isEqualTo(99L);
+    }
+
+    @Test
+    void deveExtrairMesDoRelatorio() {
+        ResolvedWhatsAppAction resultado = resolver.resolver("relatorio_mes_2026-07");
+
+        assertThat(resultado.action()).isEqualTo(WhatsAppAction.RELATORIO_MENSAL);
+        assertThat(resultado.parametro()).isEqualTo("2026-07");
     }
 
     @Test

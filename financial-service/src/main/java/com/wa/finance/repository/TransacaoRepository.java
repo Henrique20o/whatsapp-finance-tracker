@@ -41,4 +41,34 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("telefoneHash") String telefoneHash,
             @Param("inicio") LocalDateTime inicio
     );
+
+    @Query("""
+            select coalesce(sum(t.valor), 0)
+            from Transacao t
+            where t.usuario.telefoneHash = :telefoneHash
+              and t.deletado = false
+              and t.dataHora >= :inicio
+              and t.dataHora < :fimExclusivo
+            """)
+    BigDecimal somarGastosNoPeriodo(
+            @Param("telefoneHash") String telefoneHash,
+            @Param("inicio") LocalDateTime inicio,
+            @Param("fimExclusivo") LocalDateTime fimExclusivo
+    );
+
+    @Query("""
+            select new com.wa.finance.dto.GastoPorCategoriaDTO(t.categoria.nome, sum(t.valor))
+            from Transacao t
+            where t.usuario.telefoneHash = :telefoneHash
+              and t.deletado = false
+              and t.dataHora >= :inicio
+              and t.dataHora < :fimExclusivo
+            group by t.categoria.nome
+            order by sum(t.valor) desc
+            """)
+    List<GastoPorCategoriaDTO> somarGastosPorCategoriaNoPeriodo(
+            @Param("telefoneHash") String telefoneHash,
+            @Param("inicio") LocalDateTime inicio,
+            @Param("fimExclusivo") LocalDateTime fimExclusivo
+    );
 }

@@ -10,6 +10,7 @@ import java.util.Set;
 public class WhatsAppActionResolver {
 
     private static final String CANCEL_PREFIX = "cancelar_transacao_";
+    private static final String MONTH_REPORT_PREFIX = "relatorio_mes_";
     private static final Set<String> MENU_COMMANDS = Set.of(
             "oi", "ola", "menu", "inicio", "comecar"
     );
@@ -20,7 +21,15 @@ public class WhatsAppActionResolver {
         if (comando.startsWith(CANCEL_PREFIX)) {
             return new ResolvedWhatsAppAction(
                     WhatsAppAction.CANCELAR_TRANSACAO,
-                    extrairTransacaoId(comando)
+                    extrairTransacaoId(comando),
+                    null
+            );
+        }
+
+        if (comando.startsWith(MONTH_REPORT_PREFIX)) {
+            return ResolvedWhatsAppAction.withParameter(
+                    WhatsAppAction.RELATORIO_MENSAL,
+                    comando.substring(MONTH_REPORT_PREFIX.length())
             );
         }
 
@@ -33,6 +42,10 @@ public class WhatsAppActionResolver {
                     ResolvedWhatsAppAction.of(WhatsAppAction.REGISTRAR_GASTO);
             case "ver relatorio", "ver_relatorio" ->
                     ResolvedWhatsAppAction.of(WhatsAppAction.VER_RELATORIO);
+            case "relatorio 7 dias", "relatorio_7_dias" ->
+                    ResolvedWhatsAppAction.of(WhatsAppAction.RELATORIO_SETE_DIAS);
+            case "relatorio 30 dias", "relatorio_30_dias" ->
+                    ResolvedWhatsAppAction.of(WhatsAppAction.RELATORIO_TRINTA_DIAS);
             case "mais opcoes", "mais_opcoes" ->
                     ResolvedWhatsAppAction.of(WhatsAppAction.MAIS_OPCOES);
             case "gerenciar categorias", "gerenciar_categorias" ->

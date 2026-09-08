@@ -16,11 +16,17 @@ import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.util.List;
 import java.util.Locale;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class WhatsAppFlowRouter {
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("America/Sao_Paulo");
 
     private final WhatsAppActionResolver actionResolver;
     private final WhatsAppQueueProducer producer;
@@ -47,7 +53,11 @@ public class WhatsAppFlowRouter {
         switch (resolved.action()) {
             case ABRIR_MENU -> abrirMenuPrincipal(telefone);
             case REGISTRAR_GASTO -> iniciarRegistroDeGasto(telefone);
-            case VER_RELATORIO -> enviarRelatorio(telefone);
+            case VER_RELATORIO -> wuzApiClient.enviarMenuPeriodoRelatorio(
+                    telefone, YearMonth.now(BUSINESS_ZONE));
+            case RELATORIO_SETE_DIAS -> enviarRelatorioDosUltimosDias(telefone, 7);
+            case RELATORIO_TRINTA_DIAS -> enviarRelatorioDosUltimosDias(telefone, 30);
+            case RELATORIO_MENSAL -> enviarRelatorioMensal(telefone, resolved.parametro());
             case MAIS_OPCOES -> wuzApiClient.enviarMenuMaisOpcoes(telefone);
             case GERENCIAR_CATEGORIAS -> wuzApiClient.enviarMenuCategorias(telefone);
             case LISTAR_CATEGORIAS -> enviarCategorias(telefone);
@@ -173,8 +183,39 @@ public class WhatsAppFlowRouter {
         );
     }
 
-    private void enviarRelatorio(String telefone) {
-        var resumo = financialReportClient.buscarResumo(telefone);
+    private void enviarRelatorioDosUltimosDias(String telefone, int dias) {
+        LocalDate fim = LocalDate.now(BUSINESS_ZONE);
+        LocalDate inicio = fim.minusDays(dias - 1L);
+        enviarRelatorioDoPeriodo(telefone, inicio, fim, "Últimos " + dias + " dias");
+    }
+
+    private void enviarRelatorioMensal(String telefone, String referencia) {
+        YearMonth mes;
+        try {
+            mes = YearMonth.parse(referencia);
+        } catch (RuntimeException exception) {
+            wuzApiClient.enviarMensagem(telefone, "Não foi possível identificar o mês do relatório.");
+            return;
+        }
+
+        YearMonth mesAtual = YearMonth.now(BUSINESS_ZONE);
+        if (mes.isAfter(mesAtual)) {
+            wuzApiClient.enviarMensagem(telefone, "Não é possível consultar um mês futuro.");
+            return;
+        }
+
+        String titulo = mes.format(DateTimeFormatter.ofPattern("MMMM 'de' yyyy", Locale.of("pt", "BR")));
+        enviarRelatorioDoPeriodo(telefone, mes.atDay(1), mes.atEndOfMonth(), capitalizar(titulo));
+        wuzApiClient.enviarNavegacaoMensal(telefone, mes);
+    }
+
+    private void enviarRelatorioDoPeriodo(
+            String telefone,
+            LocalDate inicio,
+            LocalDate fim,
+            String tituloPeriodo
+    ) {
+        var resumo = financialReportClient.buscarRelatorioPorPeriodo(telefone, inicio, fim);
         NumberFormat moeda = criarFormatadorDeMoeda();
         List<GastoPorCategoriaDTO> gastos = resumo.gastosPorCategoria() == null
                 ? List.of()
@@ -182,16 +223,15 @@ public class WhatsAppFlowRouter {
 
         wuzApiClient.enviarMensagem(
                 telefone,
-                "📊 *Resumo financeiro*\n\n"
-                        + "Últimos 7 dias: " + moeda.format(resumo.totalSeteDias()) + "\n"
-                        + "Últimos 30 dias: " + moeda.format(resumo.totalTrintaDias())
-                        + formatarCategorias(gastos, resumo.totalTrintaDias(), moeda)
+                "📊 *Resumo financeiro — " + tituloPeriodo + "*\n\n"
+                        + "Total: " + moeda.format(resumo.total())
+                        + formatarCategorias(gastos, resumo.total(), moeda)
         );
 
-        if (!gastos.isEmpty() && resumo.totalTrintaDias().signum() > 0) {
+        if (!gastos.isEmpty() && resumo.total() != null && resumo.total().signum() > 0) {
             wuzApiClient.enviarImagem(
                     telefone,
-                    "Gastos por categoria nos últimos 30 dias",
+                    "Gastos por categoria — " + tituloPeriodo,
                     pieChartService.gerarGraficoBase64(gastos)
             );
         }
@@ -244,7 +284,7 @@ public class WhatsAppFlowRouter {
             NumberFormat moeda
     ) {
         if (gastos.isEmpty() || total == null || total.signum() <= 0) {
-            return "\n\nNenhum gasto registrado nos últimos 30 dias.";
+            return "\n\nNenhum gasto registrado nesse período.";
         }
 
         StringBuilder texto = new StringBuilder("\n\n*Por categoria:*\n");
@@ -264,5 +304,9 @@ public class WhatsAppFlowRouter {
         }
 
         return texto.toString().stripTrailing();
+    }
+
+    private String capitalizar(String texto) {
+        return texto.isEmpty() ? texto : Character.toUpperCase(texto.charAt(0)) + texto.substring(1);
     }
 }
