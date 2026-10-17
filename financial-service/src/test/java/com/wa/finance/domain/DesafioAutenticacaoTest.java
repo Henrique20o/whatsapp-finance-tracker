@@ -53,6 +53,61 @@ class DesafioAutenticacaoTest {
         )).isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void deveContabilizarTentativasEInvalidarNaQuintaFalha() {
+        DesafioAutenticacao desafio = desafio();
+
+        for (int tentativa = 1; tentativa <= DesafioAutenticacao.MAX_TENTATIVAS; tentativa++) {
+            desafio.registrarTentativaIncorreta(CRIADO_EM.plusSeconds(tentativa));
+            assertThat(desafio.getTentativas()).isEqualTo((short) tentativa);
+        }
+
+        assertThat(desafio.getInvalidadoEm()).isEqualTo(CRIADO_EM.plusSeconds(5));
+        assertThat(desafio.estaDisponivel(CRIADO_EM.plusSeconds(6))).isFalse();
+        assertThatThrownBy(() -> desafio.registrarTentativaIncorreta(CRIADO_EM.plusSeconds(7)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void deveConsumirUmaUnicaVez() {
+        DesafioAutenticacao desafio = desafio();
+        Instant consumidoEm = CRIADO_EM.plusSeconds(30);
+
+        desafio.consumir(consumidoEm);
+
+        assertThat(desafio.getConsumidoEm()).isEqualTo(consumidoEm);
+        assertThat(desafio.estaDisponivel(consumidoEm.plusSeconds(1))).isFalse();
+        assertThatThrownBy(() -> desafio.consumir(consumidoEm.plusSeconds(2)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void naoDeveConsumirDesafioExpiradoOuInvalidado() {
+        DesafioAutenticacao expirado = desafio();
+        DesafioAutenticacao invalidado = desafio();
+        invalidado.invalidar(CRIADO_EM.plusSeconds(10));
+
+        assertThatThrownBy(() -> expirado.consumir(CRIADO_EM.plus(5, ChronoUnit.MINUTES)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> invalidado.consumir(CRIADO_EM.plusSeconds(20)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void deveRejeitarTentativaOuConsumoAnterioresACriacao() {
+        DesafioAutenticacao desafio = desafio();
+        Instant instanteInvalido = CRIADO_EM.minusSeconds(1);
+
+        assertThatThrownBy(() -> desafio.registrarTentativaIncorreta(instanteInvalido))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Tentativa anterior à criação");
+        assertThatThrownBy(() -> desafio.consumir(instanteInvalido))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Consumo anterior à criação");
+        assertThat(desafio.getTentativas()).isZero();
+        assertThat(desafio.getConsumidoEm()).isNull();
+    }
+
     private DesafioAutenticacao desafio() {
         return DesafioAutenticacao.criar(
                 UUID.randomUUID(),

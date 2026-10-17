@@ -42,6 +42,19 @@ public class MobileApiExceptionHandler {
         );
     }
 
+    @ExceptionHandler(InvalidVerificationCodeException.class)
+    public ResponseEntity<MobileErrorResponse> invalidOrExpiredCode(
+            InvalidVerificationCodeException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                request,
+                HttpStatus.UNAUTHORIZED,
+                "INVALID_OR_EXPIRED_CODE",
+                "O código é inválido ou expirou"
+        );
+    }
+
     @ExceptionHandler({InvalidClientAddressException.class, DataAccessException.class, TransactionException.class})
     public ResponseEntity<MobileErrorResponse> unavailable(
             Exception exception,

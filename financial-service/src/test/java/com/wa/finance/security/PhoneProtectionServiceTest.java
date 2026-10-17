@@ -29,6 +29,12 @@ class PhoneProtectionServiceTest {
         assertThat(first).isNotEqualTo(second);
         assertThat(service.lookupHash("5531999998888"))
                 .isEqualTo(service.lookupHash("+55 (31) 99999-8888"));
+        assertThat(service.matchesLookupHash(
+                service.lookupHash("5531999998888"),
+                "+55 (31) 99999-8888"
+        )).isTrue();
+        assertThat(service.matchesLookupHash("0".repeat(64), "5531999998888")).isFalse();
+        assertThat(service.matchesLookupHash("hash-invalido", "5531999998888")).isFalse();
     }
 
     @Test

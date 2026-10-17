@@ -15,6 +15,8 @@ import java.util.UUID;
 @Table(name = "tb_desafio_autenticacao")
 public class DesafioAutenticacao {
 
+    public static final short MAX_TENTATIVAS = 5;
+
     @Id
     private UUID id;
 
@@ -112,7 +114,32 @@ public class DesafioAutenticacao {
     }
 
     public boolean estaDisponivel(Instant agora) {
-        return !foiFinalizado() && !estaExpirado(agora);
+        return !foiFinalizado() && !estaExpirado(agora) && tentativas < MAX_TENTATIVAS;
+    }
+
+    public void registrarTentativaIncorreta(Instant agora) {
+        Objects.requireNonNull(agora);
+        if (agora.isBefore(criadoEm)) {
+            throw new IllegalArgumentException("Tentativa anterior à criação");
+        }
+        if (!estaDisponivel(agora)) {
+            throw new IllegalStateException("Desafio indisponível para nova tentativa");
+        }
+        tentativas++;
+        if (tentativas == MAX_TENTATIVAS) {
+            invalidadoEm = agora;
+        }
+    }
+
+    public void consumir(Instant agora) {
+        Objects.requireNonNull(agora);
+        if (!estaDisponivel(agora)) {
+            throw new IllegalStateException("Desafio indisponível para consumo");
+        }
+        if (agora.isBefore(criadoEm)) {
+            throw new IllegalArgumentException("Consumo anterior à criação");
+        }
+        consumidoEm = agora;
     }
 
     public void invalidar(Instant agora) {

@@ -2,6 +2,9 @@ package com.wa.finance.controller.mobile;
 
 import com.wa.finance.service.SolicitacaoCodigoCriada;
 import com.wa.finance.service.SolicitacaoCodigoService;
+import com.wa.finance.service.CodigoConfirmado;
+import com.wa.finance.service.ConfirmacaoCodigoResultado;
+import com.wa.finance.service.ConfirmacaoCodigoService;
 import com.wa.finance.web.mobile.ClientIpResolver;
 import com.wa.finance.web.mobile.MobileApiExceptionHandler;
 import com.wa.finance.web.mobile.MobileCorrelationIdFilter;
@@ -27,16 +30,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MobileAuthControllerTest {
 
     private static final String PATH = "/mobile/v1/auth/codes";
+    private static final String VERIFY_PATH = PATH + "/verify";
     private static final String UUID_PATTERN =
             "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 
     private TestSolicitacaoCodigoService service;
+    private TestConfirmacaoCodigoService confirmacaoService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void configurar() {
         service = new TestSolicitacaoCodigoService();
-        MobileAuthController controller = new MobileAuthController(service, new ClientIpResolver());
+        confirmacaoService = new TestConfirmacaoCodigoService();
+        MobileAuthController controller = new MobileAuthController(
+                service, confirmacaoService, new ClientIpResolver());
         Clock clock = Clock.fixed(Instant.parse("2026-10-14T20:30:00Z"), ZoneOffset.UTC);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new MobileApiExceptionHandler(clock))
@@ -108,9 +115,69 @@ class MobileAuthControllerTest {
                 )));
     }
 
+    @Test
+    void deveConfirmarCodigoComRespostaSemConteudoESemCache() throws Exception {
+        UUID challengeId = UUID.randomUUID();
+        confirmacaoService.resultado = ConfirmacaoCodigoResultado.confirmado(
+                new CodigoConfirmado(42L, "Galaxy S24"));
+
+        mockMvc.perform(post(VERIFY_PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "challengeId":"%s",
+                                  "codigo":"482913",
+                                  "nomeDispositivo":"Galaxy S24"
+                                }
+                                """.formatted(challengeId)))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string(MobileCorrelationIdFilter.HEADER_NAME, matchesPattern(UUID_PATTERN)))
+                .andExpect(content().string(""));
+
+        org.assertj.core.api.Assertions.assertThat(confirmacaoService.challengeId).isEqualTo(challengeId);
+        org.assertj.core.api.Assertions.assertThat(confirmacaoService.codigo).isEqualTo("482913");
+        org.assertj.core.api.Assertions.assertThat(confirmacaoService.nomeDispositivo).isEqualTo("Galaxy S24");
+        org.assertj.core.api.Assertions.assertThat(confirmacaoService.correlationId).matches(UUID_PATTERN);
+    }
+
+    @Test
+    void deveResponderErroGenericoQuandoConfirmacaoForRejeitada() throws Exception {
+        UUID challengeId = UUID.randomUUID();
+        confirmacaoService.resultado = ConfirmacaoCodigoResultado.rejeitado();
+
+        mockMvc.perform(post(VERIFY_PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + challengeId + "\",\"codigo\":\"000000\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.code").value("INVALID_OR_EXPIRED_CODE"))
+                .andExpect(jsonPath("$.message").value("O código é inválido ou expirou"))
+                .andExpect(jsonPath("$.path").value(VERIFY_PATH));
+    }
+
+    @Test
+    void deveRejeitarContratoInvalidoNaConfirmacao() throws Exception {
+        assertInvalidVerify("{}");
+        assertInvalidVerify("{\"challengeId\":\"invalido\",\"codigo\":\"123456\"}");
+        assertInvalidVerify("{\"challengeId\":\"" + UUID.randomUUID() + "\",\"codigo\":\"12345\"}");
+        assertInvalidVerify("{\"challengeId\":\"" + UUID.randomUUID()
+                + "\",\"codigo\":\"123456\",\"nomeDispositivo\":\"   \"}");
+        assertInvalidVerify("{\"challengeId\":\"" + UUID.randomUUID()
+                + "\",\"codigo\":\"123456\",\"telefone\":\"5531999998888\"}");
+    }
+
     private void assertInvalid(String json) throws Exception {
         mockMvc.perform(post(PATH)
                         .with(remoteAddress("192.0.2.10"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    private void assertInvalidVerify(String json) throws Exception {
+        mockMvc.perform(post(VERIFY_PATH)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isBadRequest())
@@ -150,6 +217,33 @@ class MobileAuthControllerTest {
             if (falha != null) {
                 throw falha;
             }
+            return resultado;
+        }
+    }
+
+    private static final class TestConfirmacaoCodigoService extends ConfirmacaoCodigoService {
+
+        private ConfirmacaoCodigoResultado resultado = ConfirmacaoCodigoResultado.rejeitado();
+        private UUID challengeId;
+        private String codigo;
+        private String nomeDispositivo;
+        private String correlationId;
+
+        private TestConfirmacaoCodigoService() {
+            super(null, null, null, null, null);
+        }
+
+        @Override
+        public ConfirmacaoCodigoResultado confirmar(
+                UUID challengeId,
+                String codigo,
+                String nomeDispositivo,
+                String correlationId
+        ) {
+            this.challengeId = challengeId;
+            this.codigo = codigo;
+            this.nomeDispositivo = nomeDispositivo;
+            this.correlationId = correlationId;
             return resultado;
         }
     }

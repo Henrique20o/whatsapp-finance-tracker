@@ -6,6 +6,8 @@ import com.wa.finance.repository.DesafioAutenticacaoRepository;
 import com.wa.finance.security.PhoneProtectionService;
 import com.wa.finance.service.DesafioAutenticacaoService;
 import com.wa.finance.service.DesafioCriado;
+import com.wa.finance.service.ConfirmacaoCodigoResultado;
+import com.wa.finance.service.ConfirmacaoCodigoService;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,6 +80,9 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
 
     @Autowired
     private DesafioAutenticacaoRepository desafioRepository;
+
+    @Autowired
+    private ConfirmacaoCodigoService confirmacaoCodigoService;
 
     @Autowired
     private PhoneProtectionService phoneProtectionService;
@@ -279,6 +284,113 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
             iniciar.countDown();
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    void deveConfirmarCodigoUmaUnicaVezMesmoComRequisicoesConcorrentes() throws Exception {
+        String telefone = "5511954321098";
+        DesafioCriado criado = desafioService.criar(telefone, "192.0.2.40");
+        CountDownLatch prontas = new CountDownLatch(2);
+        CountDownLatch iniciar = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<ConfirmacaoCodigoResultado> first = executor.submit(() -> {
+                prontas.countDown();
+                iniciar.await(10, TimeUnit.SECONDS);
+                return confirmacaoCodigoService.confirmar(
+                        criado.getChallengeId(),
+                        criado.getCodigoParaEnvio(),
+                        "Dispositivo A",
+                        UUID.randomUUID().toString());
+            });
+            Future<ConfirmacaoCodigoResultado> second = executor.submit(() -> {
+                prontas.countDown();
+                iniciar.await(10, TimeUnit.SECONDS);
+                return confirmacaoCodigoService.confirmar(
+                        criado.getChallengeId(),
+                        criado.getCodigoParaEnvio(),
+                        "Dispositivo B",
+                        UUID.randomUUID().toString());
+            });
+
+            assertThat(prontas.await(10, TimeUnit.SECONDS)).isTrue();
+            iniciar.countDown();
+
+            List<ConfirmacaoCodigoResultado> resultados = List.of(
+                    first.get(30, TimeUnit.SECONDS),
+                    second.get(30, TimeUnit.SECONDS));
+
+            assertThat(resultados).filteredOn(ConfirmacaoCodigoResultado::foiConfirmado).hasSize(1);
+            assertThat(resultados).filteredOn(resultado -> !resultado.foiConfirmado()).hasSize(1);
+
+            DesafioAutenticacao persistido = desafioRepository.findById(criado.getChallengeId()).orElseThrow();
+            assertThat(persistido.getConsumidoEm()).isNotNull();
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM tb_usuario WHERE telefone_hash = ?",
+                    Integer.class,
+                    phoneProtectionService.lookupHash(telefone))).isEqualTo(1);
+        } finally {
+            iniciar.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void devePersistirTentativasIncorretasEInvalidarNaQuinta() {
+        String telefone = "5511943210987";
+        DesafioCriado criado = desafioService.criar(telefone, "192.0.2.41");
+
+        for (int tentativa = 1; tentativa <= DesafioAutenticacao.MAX_TENTATIVAS; tentativa++) {
+            ConfirmacaoCodigoResultado resultado = confirmacaoCodigoService.confirmar(
+                    criado.getChallengeId(),
+                    "000000".equals(criado.getCodigoParaEnvio()) ? "000001" : "000000",
+                    null,
+                    UUID.randomUUID().toString());
+            assertThat(resultado.foiConfirmado()).isFalse();
+        }
+
+        DesafioAutenticacao persistido = desafioRepository.findById(criado.getChallengeId()).orElseThrow();
+        assertThat(persistido.getTentativas()).isEqualTo(DesafioAutenticacao.MAX_TENTATIVAS);
+        assertThat(persistido.getInvalidadoEm()).isNotNull();
+        assertThat(confirmacaoCodigoService.confirmar(
+                criado.getChallengeId(),
+                criado.getCodigoParaEnvio(),
+                null,
+                UUID.randomUUID().toString()).foiConfirmado()).isFalse();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_usuario WHERE telefone_hash = ?",
+                Integer.class,
+                phoneProtectionService.lookupHash(telefone))).isZero();
+    }
+
+    @Test
+    void endpointDeConfirmacaoDeveConsumirCodigoERejeitarReutilizacao() throws Exception {
+        String telefone = "5511932109876";
+        DesafioCriado criado = desafioService.criar(telefone, "192.0.2.42");
+        String request = """
+                {
+                  "challengeId":"%s",
+                  "codigo":"%s",
+                  "nomeDispositivo":"Pixel de teste"
+                }
+                """.formatted(criado.getChallengeId(), criado.getCodigoParaEnvio());
+
+        mockMvc.perform(post("/mobile/v1/auth/codes/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("X-Correlation-Id", matchesPattern(
+                        "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                )));
+
+        mockMvc.perform(post("/mobile/v1/auth/codes/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_OR_EXPIRED_CODE"))
+                .andExpect(jsonPath("$.message").value("O código é inválido ou expirou"));
     }
 
     @Test

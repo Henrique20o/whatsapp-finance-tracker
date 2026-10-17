@@ -9,6 +9,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -21,6 +22,7 @@ public class PhoneProtectionService {
     private static final int IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH_BITS = 128;
     private static final Pattern MOBILE_PHONE_PATTERN = Pattern.compile("[1-9][0-9]{9,14}");
+    private static final Pattern LOOKUP_HASH_PATTERN = Pattern.compile("[0-9a-fA-F]{64}");
 
     private final SecretKeySpec encryptionKey;
     private final SecretKeySpec hashKey;
@@ -97,6 +99,19 @@ public class PhoneProtectionService {
             return HexFormat.of().formatHex(mac.doFinal(normalize(phone).getBytes(StandardCharsets.UTF_8)));
         } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("Não foi possível gerar o identificador do telefone", exception);
+        }
+    }
+
+    public boolean matchesLookupHash(String expectedHash, String phone) {
+        if (expectedHash == null || !LOOKUP_HASH_PATTERN.matcher(expectedHash).matches()) {
+            return false;
+        }
+        try {
+            byte[] expected = HexFormat.of().parseHex(expectedHash);
+            byte[] actual = HexFormat.of().parseHex(lookupHash(phone));
+            return MessageDigest.isEqual(expected, actual);
+        } catch (IllegalArgumentException exception) {
+            return false;
         }
     }
 

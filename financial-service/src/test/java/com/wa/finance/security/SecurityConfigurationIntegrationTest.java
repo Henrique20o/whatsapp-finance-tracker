@@ -73,7 +73,6 @@ class SecurityConfigurationIntegrationTest extends MobileSecurityIntegrationTest
     @Test
     void deveLiberarSomentePostNasRotasPublicasDeAutenticacao() throws Exception {
         List<String> publicPaths = List.of(
-                "/mobile/v1/auth/codes/verify",
                 "/mobile/v1/auth/refresh",
                 "/mobile/v1/auth/logout"
         );
@@ -90,7 +89,15 @@ class SecurityConfigurationIntegrationTest extends MobileSecurityIntegrationTest
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
+        mockMvc.perform(post("/mobile/v1/auth/codes/verify")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
         mockMvc.perform(get("/mobile/v1/auth/codes"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/mobile/v1/auth/codes/verify"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -233,7 +240,6 @@ class SecurityConfigurationIntegrationTest extends MobileSecurityIntegrationTest
         }
 
         @PostMapping({
-                "/mobile/v1/auth/codes/verify",
                 "/mobile/v1/auth/refresh",
                 "/mobile/v1/auth/logout"
         })
