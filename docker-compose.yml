@@ -39,7 +39,7 @@ services:
       start_period: 10s
 
   wuzapi:
-    image: asternic/wuzapi:latest
+    image: asternic/wuzapi@sha256:81d12ca92f24cbfcccf02fb4ad7ad9a519366bb04e248d8476b9c1e3e46d885a
     container_name: wuzapi
     ports:
       - "127.0.0.1:8080:8080"
@@ -67,6 +67,8 @@ services:
       - WUZAPI_HMAC_KEY=${WUZAPI_HMAC_KEY:?Defina WUZAPI_HMAC_KEY no arquivo .env}
       - APP_FINANCIAL_SERVICE_URL=http://financial-service:8080
       - FINANCIAL_SERVICE_API_KEY=${FINANCIAL_SERVICE_API_KEY:?Defina FINANCIAL_SERVICE_API_KEY no arquivo .env}
+      - MOBILE_AUTH_DELIVERY_KEY=${MOBILE_AUTH_DELIVERY_KEY:?Defina MOBILE_AUTH_DELIVERY_KEY no arquivo .env}
+      - MOBILE_AUTH_DELIVERY_KEY_ID=${MOBILE_AUTH_DELIVERY_KEY_ID:-v1}
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -105,6 +107,20 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${DB_PASS}
       - PHONE_ENCRYPTION_KEY=${PHONE_ENCRYPTION_KEY:?Defina PHONE_ENCRYPTION_KEY no arquivo .env}
       - FINANCIAL_SERVICE_API_KEY=${FINANCIAL_SERVICE_API_KEY:?Defina FINANCIAL_SERVICE_API_KEY no arquivo .env}
+      - MOBILE_JWT_ISSUER=${MOBILE_JWT_ISSUER:-https://api.whatsapp-finance-tracker.local}
+      - MOBILE_JWT_AUDIENCE=${MOBILE_JWT_AUDIENCE:-finance-tracker-mobile}
+      - MOBILE_JWT_ACCESS_TOKEN_TTL=${MOBILE_JWT_ACCESS_TOKEN_TTL:-15m}
+      - MOBILE_REFRESH_TOKEN_INACTIVITY=${MOBILE_REFRESH_TOKEN_INACTIVITY:-30d}
+      - MOBILE_SESSION_ABSOLUTE_TTL=${MOBILE_SESSION_ABSOLUTE_TTL:-90d}
+      - MOBILE_AUTH_HMAC_KEY=${MOBILE_AUTH_HMAC_KEY:?Defina MOBILE_AUTH_HMAC_KEY no arquivo .env}
+      - MOBILE_AUTH_DELIVERY_KEY=${MOBILE_AUTH_DELIVERY_KEY:?Defina MOBILE_AUTH_DELIVERY_KEY no arquivo .env}
+      - MOBILE_AUTH_DELIVERY_KEY_ID=${MOBILE_AUTH_DELIVERY_KEY_ID:-v1}
+      - MOBILE_VERIFICATION_CODE_TTL=${MOBILE_VERIFICATION_CODE_TTL:-5m}
+      - MOBILE_VERIFICATION_RESEND_INTERVAL=${MOBILE_VERIFICATION_RESEND_INTERVAL:-60s}
+      - MOBILE_JWT_PRIVATE_KEY=file:/run/secrets/mobile-jwt-private.pem
+      - MOBILE_JWT_PUBLIC_KEY=file:/run/secrets/mobile-jwt-public.pem
+    volumes:
+      - ${MOBILE_JWT_KEYS_DIR:?Defina MOBILE_JWT_KEYS_DIR no arquivo .env}:/run/secrets:ro
     depends_on:
       rabbitmq:
         condition: service_healthy

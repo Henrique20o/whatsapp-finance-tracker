@@ -16,6 +16,10 @@ wuzapi:
 app:
   security:
     wuzapi-hmac-key: ${WUZAPI_HMAC_KEY}
+    mobile:
+      auth-delivery:
+        key: ${MOBILE_AUTH_DELIVERY_KEY}
+        key-id: ${MOBILE_AUTH_DELIVERY_KEY_ID:v1}
   financial-service:
     url: ${APP_FINANCIAL_SERVICE_URL:http://financial-service:8080}
     api-key: ${FINANCIAL_SERVICE_API_KEY}

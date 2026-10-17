@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-services:
+    name: Testar ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - ai-service
+          - financial-service
+          - whatsapp-service
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 21 e cache do Maven
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: ${{ matrix.service }}/pom.xml
+
+      - name: Permitir execução do Maven Wrapper
+        working-directory: ${{ matrix.service }}
+        run: chmod +x mvnw
+
+      - name: Executar build e testes
+        working-directory: ${{ matrix.service }}
+        run: ./mvnw --batch-mode --no-transfer-progress clean verify
+
+  validate-compose:
+    name: Validar Docker Compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DB_USER: ci_user
+      DB_PASS: ci_password
+      RABBITMQ_USER: ci_user
+      RABBITMQ_PASS: ci_password
+      WUZAPI_ADMIN_TOKEN: ci_admin_token
+      WUZAPI_HMAC_KEY: ci_hmac_key_with_at_least_32_characters
+      WUZAPI_GLOBAL_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      AUTHENTICATION_API_KEY: ci_wuzapi_token
+      FINANCIAL_SERVICE_API_KEY: ci_financial_key_with_at_least_32_chars
+      PHONE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      OPENAI_API_KEY: ci_openai_key
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Validar configuração
+        run: docker compose config --quiet

@@ -15,7 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 		"spring.rabbitmq.listener.simple.auto-startup=false",
 		"app.outbox.enabled=false"
 })
-class FinancialServiceApplicationTests {
+class FinancialServiceApplicationTests extends MobileSecurityIntegrationTest {
 
 	@Test
 	void contextLoads() {

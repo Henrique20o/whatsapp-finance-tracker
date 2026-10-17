@@ -25,6 +25,11 @@ public class RabbitMQConfig {
     public static final String TRANSACTION_DLQ = "financeiro.v1.transacoes-entrada.dlq";
     public static final String DEAD_LETTER_EXCHANGE = "financeiro.v1.dlx";
     public static final String TRANSACTION_DLQ_ROUTING_KEY = "financeiro.v1.transacoes-entrada.failed";
+    public static final String MOBILE_AUTH_EXCHANGE = "financeiro.v1.whatsapp-auth.exchange";
+    public static final String MOBILE_AUTH_ROUTING_KEY = "financeiro.v1.whatsapp-auth.send";
+    public static final String MOBILE_AUTH_QUEUE = "financeiro.v1.whatsapp-auth";
+    public static final String MOBILE_AUTH_DLQ = "financeiro.v1.whatsapp-auth.dlq";
+    public static final String MOBILE_AUTH_DLQ_ROUTING_KEY = "financeiro.v1.whatsapp-auth.failed";
 
     @Bean
     public Queue transactionQueue() {
@@ -38,6 +43,38 @@ public class RabbitMQConfig {
         return QueueBuilder
                 .durable(WHATSAPP_OUTPUT_QUEUE)
                 .build();
+    }
+
+    @Bean
+    public DirectExchange mobileAuthExchange() {
+        return new DirectExchange(MOBILE_AUTH_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public Queue mobileAuthQueue() {
+        return QueueBuilder.durable(MOBILE_AUTH_QUEUE)
+                .deadLetterExchange(DEAD_LETTER_EXCHANGE)
+                .deadLetterRoutingKey(MOBILE_AUTH_DLQ_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    public Binding mobileAuthBinding() {
+        return BindingBuilder.bind(mobileAuthQueue())
+                .to(mobileAuthExchange())
+                .with(MOBILE_AUTH_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue mobileAuthDeadLetterQueue() {
+        return QueueBuilder.durable(MOBILE_AUTH_DLQ).build();
+    }
+
+    @Bean
+    public Binding mobileAuthDeadLetterBinding() {
+        return BindingBuilder.bind(mobileAuthDeadLetterQueue())
+                .to(deadLetterExchange())
+                .with(MOBILE_AUTH_DLQ_ROUTING_KEY);
     }
 
     @Bean

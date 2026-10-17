@@ -1,5 +1,7 @@
 package com.wa.finance.outbox;
 
+import com.wa.finance.MobileSecurityIntegrationTest;
+
 import com.wa.finance.dto.RespostaUsuarioDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.rabbitmq.listener.simple.auto-startup=false",
         "app.outbox.enabled=false"
 })
-class OutboxTransactionIntegrationTest {
+class OutboxTransactionIntegrationTest extends MobileSecurityIntegrationTest {
 
     @Autowired
     private OutboxService outboxService;

@@ -19,6 +19,7 @@ Thumbs.db
 
 # Variaveis de Ambiente
 .env
+secrets/
 
 # Planejamento pessoal
 PLANO_DIRETOR.md

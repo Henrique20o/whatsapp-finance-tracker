@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 		"wuzapi.url=http://localhost:8080",
 		"wuzapi.token=test-token",
 		"app.security.wuzapi-hmac-key=chave-hmac-de-teste-com-32-caracteres",
+		"app.security.mobile.auth-delivery.key=BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
 		"app.financial-service.url=http://localhost:8084",
 		"app.financial-service.api-key=chave-interna-financeiro-de-teste-123456",
 		"spring.rabbitmq.listener.simple.auto-startup=false"

@@ -1,0 +1,799 @@
+openapi: 3.1.0
+
+info:
+  title: WhatsApp Finance Tracker Mobile API
+  version: 1.0.0
+  description: |
+    Contrato do MVP da API consumida pelo aplicativo mobile.
+
+    As rotas financeiras identificam o usuário exclusivamente pelo claim `sub`
+    do access token JWT. O aplicativo não informa telefone ou `usuarioId` para
+    selecionar o proprietário dos dados.
+
+servers:
+  - url: /
+    description: Mesmo host do financial-service
+
+tags:
+  - name: Autenticação
+    description: Solicitação e confirmação de código, renovação e encerramento de sessão.
+  - name: Categorias
+    description: Consulta das categorias ativas do usuário autenticado.
+  - name: Transações
+    description: Registro e listagem paginada dos gastos do usuário autenticado.
+  - name: Relatórios
+    description: Resumo financeiro padrão ou filtrado por período.
+
+paths:
+  /mobile/v1/auth/codes:
+    post:
+      tags:
+        - Autenticação
+      summary: Solicitar código de acesso
+      description: |
+        Cria um desafio de autenticação e solicita o envio de um código de seis
+        dígitos pelo WhatsApp. A resposta não revela se o telefone já pertence
+        a um usuário cadastrado.
+      operationId: solicitarCodigo
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitarCodigoRequest'
+            example:
+              telefone: '5531999998888'
+      responses:
+        '202':
+          description: Solicitação aceita para envio assíncrono
+          headers:
+            X-Correlation-Id:
+              description: Identificador gerado pelo servidor para rastrear a solicitação.
+              required: true
+              schema:
+                type: string
+                format: uuid
+            Cache-Control:
+              description: Impede que o desafio seja armazenado por caches.
+              required: true
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitarCodigoResponse'
+              example:
+                challengeId: 538f1567-a3eb-4e6d-b06d-e5987a340672
+                expiraEmSegundos: 300
+                reenviarEmSegundos: 60
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /mobile/v1/auth/codes/verify:
+    post:
+      tags:
+        - Autenticação
+      summary: Confirmar código e iniciar sessão
+      description: |
+        Valida o desafio e o código. Em caso de sucesso, localiza ou cria o
+        usuário, cria a sessão mobile e emite um access token JWT e um refresh
+        token opaco.
+      operationId: verificarCodigo
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificarCodigoRequest'
+            examples:
+              semNomeDispositivo:
+                value:
+                  challengeId: 538f1567-a3eb-4e6d-b06d-e5987a340672
+                  codigo: '482913'
+              comNomeDispositivo:
+                value:
+                  challengeId: 538f1567-a3eb-4e6d-b06d-e5987a340672
+                  codigo: '482913'
+                  nomeDispositivo: Samsung Galaxy S24
+      responses:
+        '200':
+          description: Código confirmado e sessão iniciada
+          headers:
+            Cache-Control:
+              description: Impede o armazenamento da resposta por caches
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Código ou desafio inválido ou expirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: INVALID_OR_EXPIRED_CODE
+                message: O código é inválido ou expirou
+                timestamp: '2026-09-22T16:30:00-03:00'
+                path: /mobile/v1/auth/codes/verify
+                correlationId: b5f670f5-a9b8-4597-ad03-2af7b35fb391
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /mobile/v1/auth/refresh:
+    post:
+      tags:
+        - Autenticação
+      summary: Renovar sessão
+      description: |
+        Valida o refresh token, invalida o token utilizado e retorna um novo
+        access token e um novo refresh token. A reutilização de um refresh token
+        já rotacionado pode revogar toda a família da sessão.
+      operationId: renovarSessao
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Sessão renovada e refresh token rotacionado
+          headers:
+            Cache-Control:
+              description: Impede o armazenamento da resposta por caches
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Refresh token inválido, expirado, revogado ou reutilizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: INVALID_REFRESH_TOKEN
+                message: A sessão não pode ser renovada
+                timestamp: '2026-09-22T16:30:00-03:00'
+                path: /mobile/v1/auth/refresh
+                correlationId: 0044b6bf-6ca2-4e38-8d82-6d9bb26571ae
+
+  /mobile/v1/auth/logout:
+    post:
+      tags:
+        - Autenticação
+      summary: Encerrar sessão
+      description: |
+        Revoga a sessão associada ao refresh token. A operação é idempotente:
+        tokens já revogados ou não encontrados também resultam em sucesso.
+      operationId: encerrarSessao
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '204':
+          description: Sessão encerrada ou já inativa
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /mobile/v1/categorias:
+    get:
+      tags:
+        - Categorias
+      summary: Listar categorias ativas
+      description: Retorna somente as categorias ativas do usuário autenticado.
+      operationId: listarCategorias
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Categorias ativas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriasResponse'
+              example:
+                itens:
+                  - id: 1
+                    nome: Transporte
+                  - id: 2
+                    nome: Alimentação
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /mobile/v1/transacoes:
+    get:
+      tags:
+        - Transações
+      summary: Listar transações
+      description: |
+        Sem filtros de período, retorna as transações mais recentes. Quando uma
+        das datas for informada, a outra também será obrigatória. O filtro de
+        categoria é opcional. A ordenação do MVP é fixa por `dataHora` e `id`,
+        ambos em ordem decrescente.
+      operationId: listarTransacoes
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - $ref: '#/components/parameters/DataInicio'
+        - $ref: '#/components/parameters/DataFim'
+        - $ref: '#/components/parameters/CategoriaId'
+      responses:
+        '200':
+          description: Página de transações do usuário autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransacoesPageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Categoria não encontrada para o usuário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Transações
+      summary: Registrar transação
+      description: |
+        Registra um gasto para o usuário autenticado. `dataHora` é opcional; se
+        ausente, o servidor usa o momento atual. Datas futuras são rejeitadas.
+      operationId: registrarTransacao
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CriarTransacaoRequest'
+            examples:
+              agora:
+                value:
+                  valor: 45.90
+                  descricao: Almoço
+                  categoriaId: 2
+              dataInformada:
+                value:
+                  valor: 45.90
+                  descricao: Almoço
+                  categoriaId: 2
+                  dataHora: '2026-09-21T12:30:00-03:00'
+      responses:
+        '201':
+          description: Transação registrada
+          headers:
+            Location:
+              description: Caminho da transação criada
+              required: true
+              schema:
+                type: string
+                example: /mobile/v1/transacoes/135
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransacaoResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Categoria não encontrada para o usuário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Chave de idempotência reutilizada com dados diferentes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Regra financeira não atendida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /mobile/v1/relatorios/resumo:
+    get:
+      tags:
+        - Relatórios
+      summary: Consultar resumo financeiro
+      description: |
+        Sem datas, considera um período móvel de 30 dias incluindo a data atual.
+        Quando uma das datas for informada, a outra também será obrigatória. As
+        datas são inclusivas e o período máximo permitido é de um ano. Categorias
+        sem gastos não são incluídas.
+      operationId: obterResumoFinanceiro
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DataInicio'
+        - $ref: '#/components/parameters/DataFim'
+      responses:
+        '200':
+          description: Resumo financeiro do período
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatorioResumoResponse'
+              example:
+                dataInicio: '2026-09-01'
+                dataFim: '2026-09-22'
+                total: 1850.40
+                quantidadeGastos: 38
+                categorias:
+                  - categoriaId: 2
+                    nome: Alimentação
+                    total: 720.30
+                    quantidadeGastos: 14
+                    percentual: 38.93
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token JWT emitido após a confirmação do código ou renovação da sessão.
+
+  parameters:
+    Pagina:
+      name: pagina
+      in: query
+      required: false
+      description: Índice da página, começando em zero.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+    TamanhoPagina:
+      name: tamanho
+      in: query
+      required: false
+      description: Quantidade de itens por página.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
+
+    DataInicio:
+      name: dataInicio
+      in: query
+      required: false
+      description: Data inicial inclusiva. Deve ser usada junto com `dataFim`.
+      schema:
+        type: string
+        format: date
+      example: '2026-09-01'
+
+    DataFim:
+      name: dataFim
+      in: query
+      required: false
+      description: Data final inclusiva. Deve ser usada junto com `dataInicio`.
+      schema:
+        type: string
+        format: date
+      example: '2026-09-22'
+
+    CategoriaId:
+      name: categoriaId
+      in: query
+      required: false
+      description: Identificador de uma categoria pertencente ao usuário autenticado.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID gerado pelo aplicativo para impedir transações duplicadas.
+      schema:
+        type: string
+        format: uuid
+      example: d816756b-5173-43ba-823f-6fad43559c65
+
+  schemas:
+    SolicitarCodigoRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - telefone
+      properties:
+        telefone:
+          type: string
+          description: Número internacional contendo somente dígitos.
+          pattern: '^[1-9][0-9]{9,14}$'
+          example: '5531999998888'
+
+    SolicitarCodigoResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - challengeId
+        - expiraEmSegundos
+        - reenviarEmSegundos
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+        expiraEmSegundos:
+          type: integer
+          minimum: 1
+          example: 300
+        reenviarEmSegundos:
+          type: integer
+          minimum: 0
+          example: 60
+
+    VerificarCodigoRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - challengeId
+        - codigo
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+        codigo:
+          type: string
+          pattern: '^[0-9]{6}$'
+          example: '482913'
+        nomeDispositivo:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Campo opcional e apenas informativo; não comprova a identidade do aparelho.
+          example: Samsung Galaxy S24
+
+    RefreshTokenRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          minLength: 32
+          writeOnly: true
+          description: Token opaco armazenado de forma segura pelo aplicativo.
+          example: token-opaco-nao-real-com-valor-aleatorio
+
+    TokenResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - accessToken
+        - tokenType
+        - accessTokenExpiraEmSegundos
+        - refreshToken
+        - refreshTokenExpiraEmSegundos
+      properties:
+        accessToken:
+          type: string
+          readOnly: true
+          description: JWT usado no header Authorization das rotas protegidas.
+          example: eyJhbGciOiJSUzI1NiJ9.exemplo.assinatura
+        tokenType:
+          type: string
+          const: Bearer
+        accessTokenExpiraEmSegundos:
+          type: integer
+          minimum: 1
+          example: 900
+        refreshToken:
+          type: string
+          readOnly: true
+          description: Refresh token opaco. A resposta seguinte à renovação contém um novo valor.
+          example: novo-token-opaco-nao-real-com-valor-aleatorio
+        refreshTokenExpiraEmSegundos:
+          type: integer
+          minimum: 1
+          example: 2592000
+
+    CategoriaResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - nome
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 50
+
+    CategoriasResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - itens
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoriaResponse'
+
+    CriarTransacaoRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - valor
+        - descricao
+        - categoriaId
+      properties:
+        valor:
+          type: number
+          multipleOf: 0.01
+          exclusiveMinimum: 0
+          maximum: 9999999999999.99
+          example: 45.90
+        descricao:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Almoço
+        categoriaId:
+          type: integer
+          format: int64
+          minimum: 1
+          example: 2
+        dataHora:
+          type: string
+          format: date-time
+          description: Opcional. Se ausente, usa o momento atual. Não pode estar no futuro.
+          example: '2026-09-21T12:30:00-03:00'
+
+    TransacaoResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - valor
+        - descricao
+        - dataHora
+        - categoria
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        valor:
+          type: number
+          multipleOf: 0.01
+          example: 45.90
+        descricao:
+          type: string
+          example: Almoço
+        dataHora:
+          type: string
+          format: date-time
+          example: '2026-09-21T12:30:00-03:00'
+        categoria:
+          $ref: '#/components/schemas/CategoriaResponse'
+
+    TransacoesPageResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - itens
+        - pagina
+        - tamanho
+        - totalElementos
+        - totalPaginas
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransacaoResponse'
+        pagina:
+          type: integer
+          minimum: 0
+        tamanho:
+          type: integer
+          minimum: 1
+          maximum: 50
+        totalElementos:
+          type: integer
+          format: int64
+          minimum: 0
+        totalPaginas:
+          type: integer
+          minimum: 0
+
+    CategoriaResumoResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - categoriaId
+        - nome
+        - total
+        - quantidadeGastos
+        - percentual
+      properties:
+        categoriaId:
+          type: integer
+          format: int64
+          minimum: 1
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 50
+        total:
+          type: number
+          multipleOf: 0.01
+          minimum: 0
+        quantidadeGastos:
+          type: integer
+          minimum: 0
+        percentual:
+          type: number
+          minimum: 0
+          maximum: 100
+
+    RelatorioResumoResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - dataInicio
+        - dataFim
+        - total
+        - quantidadeGastos
+        - categorias
+      properties:
+        dataInicio:
+          type: string
+          format: date
+        dataFim:
+          type: string
+          format: date
+        total:
+          type: number
+          multipleOf: 0.01
+          minimum: 0
+        quantidadeGastos:
+          type: integer
+          minimum: 0
+        categorias:
+          type: array
+          description: Somente categorias com gastos no período.
+          items:
+            $ref: '#/components/schemas/CategoriaResumoResponse'
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - timestamp
+        - path
+        - correlationId
+      properties:
+        code:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]*$'
+          example: INVALID_REQUEST
+        message:
+          type: string
+          example: Os dados enviados são inválidos
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-09-22T16:30:00-03:00'
+        path:
+          type: string
+          example: /mobile/v1/transacoes
+        correlationId:
+          type: string
+          format: uuid
+          example: b5f670f5-a9b8-4597-ad03-2af7b35fb391
+
+  responses:
+    BadRequest:
+      description: Requisição malformada ou parâmetros inválidos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: INVALID_REQUEST
+            message: Os dados enviados são inválidos
+            timestamp: '2026-09-22T16:30:00-03:00'
+            path: /mobile/v1/transacoes
+            correlationId: b5f670f5-a9b8-4597-ad03-2af7b35fb391
+
+    Unauthorized:
+      description: Access token ausente, inválido ou expirado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: UNAUTHORIZED
+            message: Autenticação necessária
+            timestamp: '2026-09-22T16:30:00-03:00'
+            path: /mobile/v1/transacoes
+            correlationId: b5f670f5-a9b8-4597-ad03-2af7b35fb391
+
+    TooManyRequests:
+      description: Limite de solicitações ou tentativas atingido
+      headers:
+        Retry-After:
+          description: Segundos até uma nova tentativa ser permitida
+          schema:
+            type: integer
+            minimum: 1
+            example: 60
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: RATE_LIMIT_EXCEEDED
+            message: Aguarde antes de tentar novamente
+            timestamp: '2026-09-22T16:30:00-03:00'
+            path: /mobile/v1/auth/codes
+            correlationId: b5f670f5-a9b8-4597-ad03-2af7b35fb391
+
+    ServiceUnavailable:
+      description: Serviço temporariamente indisponível
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: SERVICE_UNAVAILABLE
+            message: Não foi possível processar a solicitação agora
+            timestamp: '2026-09-22T16:30:00-03:00'
+            path: /mobile/v1/auth/codes
+            correlationId: b5f670f5-a9b8-4597-ad03-2af7b35fb391

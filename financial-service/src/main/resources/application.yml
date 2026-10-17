@@ -10,6 +10,10 @@ spring:
     port: 5672
     username: ${RABBITMQ_USER:admin}
     password: ${RABBITMQ_PASS:adminpassword}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
 
   jpa:
     hibernate:
@@ -38,3 +42,18 @@ app:
   security:
     phone-key: ${PHONE_ENCRYPTION_KEY}
     internal-api-key: ${FINANCIAL_SERVICE_API_KEY}
+    mobile:
+      issuer: ${MOBILE_JWT_ISSUER:https://api.whatsapp-finance-tracker.local}
+      audience: ${MOBILE_JWT_AUDIENCE:finance-tracker-mobile}
+      access-token-ttl: ${MOBILE_JWT_ACCESS_TOKEN_TTL:15m}
+      refresh-token-inactivity: ${MOBILE_REFRESH_TOKEN_INACTIVITY:30d}
+      session-absolute-ttl: ${MOBILE_SESSION_ABSOLUTE_TTL:90d}
+      private-key: ${MOBILE_JWT_PRIVATE_KEY}
+      public-key: ${MOBILE_JWT_PUBLIC_KEY}
+      verification-code:
+        hmac-key: ${MOBILE_AUTH_HMAC_KEY}
+        ttl: ${MOBILE_VERIFICATION_CODE_TTL:5m}
+        resend-interval: ${MOBILE_VERIFICATION_RESEND_INTERVAL:60s}
+      auth-delivery:
+        key: ${MOBILE_AUTH_DELIVERY_KEY}
+        key-id: ${MOBILE_AUTH_DELIVERY_KEY_ID:v1}

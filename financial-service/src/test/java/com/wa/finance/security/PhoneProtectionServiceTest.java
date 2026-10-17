@@ -37,4 +37,21 @@ class PhoneProtectionServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("32 bytes");
     }
+
+    @Test
+    void deveValidarTelefoneInternacionalNormalizado() {
+        assertThat(service.normalize("+55 (31) 99999-8888")).isEqualTo("5531999998888");
+        assertThat(service.normalize("1234567890")).isEqualTo("1234567890");
+        assertThat(service.normalize("123456789012345")).isEqualTo("123456789012345");
+
+        assertThatThrownBy(() -> service.normalize("123456789"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Telefone inválido");
+        assertThatThrownBy(() -> service.normalize("1234567890123456"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Telefone inválido");
+        assertThatThrownBy(() -> service.normalize("0123456789"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Telefone inválido");
+    }
 }

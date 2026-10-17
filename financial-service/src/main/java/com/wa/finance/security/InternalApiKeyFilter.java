@@ -6,12 +6,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.List;
 
 @Component
 public class InternalApiKeyFilter extends OncePerRequestFilter {
@@ -25,11 +29,6 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
             throw new IllegalStateException("FINANCIAL_SERVICE_API_KEY deve possuir pelo menos 32 caracteres");
         }
         this.expectedApiKey = apiKey.getBytes(StandardCharsets.UTF_8);
-    }
-
-    @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/actuator/health");
     }
 
     @Override
@@ -51,6 +50,12 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
             return;
         }
 
+        var authentication = UsernamePasswordAuthenticationToken.authenticated(
+                "internal-service",
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_INTERNAL"))
+        );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
         filterChain.doFilter(request, response);
     }
 }

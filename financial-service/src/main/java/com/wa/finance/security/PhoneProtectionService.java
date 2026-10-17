@@ -12,6 +12,7 @@ import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.regex.Pattern;
 
 @Service
 public class PhoneProtectionService {
@@ -19,6 +20,7 @@ public class PhoneProtectionService {
     private static final String VERSION_PREFIX = "v1:";
     private static final int IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH_BITS = 128;
+    private static final Pattern MOBILE_PHONE_PATTERN = Pattern.compile("[1-9][0-9]{9,14}");
 
     private final SecretKeySpec encryptionKey;
     private final SecretKeySpec hashKey;
@@ -44,7 +46,7 @@ public class PhoneProtectionService {
             throw new IllegalArgumentException("Telefone obrigatório");
         }
         String normalized = phone.replaceAll("\\D", "");
-        if (normalized.length() < 8 || normalized.length() > 15) {
+        if (!MOBILE_PHONE_PATTERN.matcher(normalized).matches()) {
             throw new IllegalArgumentException("Telefone inválido");
         }
         return normalized;
