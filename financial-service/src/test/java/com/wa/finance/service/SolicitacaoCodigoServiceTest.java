@@ -141,7 +141,7 @@ class SolicitacaoCodigoServiceTest {
         private int chamadas;
 
         private TestDesafioAutenticacaoService() {
-            super(null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null);
         }
 
         @Override

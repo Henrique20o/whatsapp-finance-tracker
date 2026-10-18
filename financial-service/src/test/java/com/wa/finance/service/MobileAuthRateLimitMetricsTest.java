@@ -14,6 +14,7 @@ class MobileAuthRateLimitMetricsTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         MobileAuthRateLimitMetrics metrics = new MobileAuthRateLimitMetrics(registry);
         RateLimitDecision decision = RateLimitDecision.blocked(
+                Instant.parse("2026-10-18T15:00:00Z"),
                 Instant.parse("2026-10-18T15:01:00Z"),
                 60,
                 RateLimitScope.PHONE,

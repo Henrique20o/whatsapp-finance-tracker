@@ -12,10 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,8 +43,8 @@ class DesafioAutenticacaoServiceTest {
         ipProtectionService = mock(ClientIpProtectionService.class);
         repository = mock(DesafioAutenticacaoRepository.class);
         rateLimitService = mock(MobileAuthRateLimitService.class);
-        when(rateLimitService.evaluate(any(), any(), any()))
-                .thenReturn(RateLimitDecision.permit());
+        when(rateLimitService.evaluate(any(), any()))
+                .thenReturn(RateLimitDecision.permit(AGORA));
 
         VerificationCodeProperties properties = new VerificationCodeProperties();
         properties.setHmacKey(Base64.getEncoder().encodeToString(new byte[32]));
@@ -60,8 +58,7 @@ class DesafioAutenticacaoServiceTest {
                 ipProtectionService,
                 repository,
                 rateLimitService,
-                properties,
-                Clock.fixed(AGORA, ZoneOffset.UTC)
+                properties
         );
     }
 
@@ -114,7 +111,7 @@ class DesafioAutenticacaoServiceTest {
         service.criar("5531999998888", "192.0.2.10");
 
         InOrder order = inOrder(rateLimitService, repository);
-        order.verify(rateLimitService).evaluate(telefoneHash, "c".repeat(64), AGORA);
+        order.verify(rateLimitService).evaluate(telefoneHash, "c".repeat(64));
         order.verify(repository).invalidarNaoFinalizadosPorTelefone(telefoneHash, AGORA);
         order.verify(repository).save(any(DesafioAutenticacao.class));
     }
@@ -126,8 +123,9 @@ class DesafioAutenticacaoServiceTest {
         when(phoneProtectionService.normalize(any())).thenReturn("5531999998888");
         when(phoneProtectionService.lookupHash(any())).thenReturn(telefoneHash);
         when(ipProtectionService.hash(any())).thenReturn(ipHash);
-        when(rateLimitService.evaluate(telefoneHash, ipHash, AGORA))
+        when(rateLimitService.evaluate(telefoneHash, ipHash))
                 .thenReturn(RateLimitDecision.blocked(
+                        AGORA,
                         AGORA.plusSeconds(60),
                         60,
                         RateLimitScope.PHONE,

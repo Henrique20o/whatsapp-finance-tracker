@@ -10,6 +10,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -25,26 +26,29 @@ public class MobileAuthRateLimitService {
     private final DesafioAutenticacaoLockRepository lockRepository;
     private final MobileAuthRateLimitProperties properties;
     private final MobileAuthRateLimitMetrics metrics;
+    private final Clock clock;
 
     public MobileAuthRateLimitService(
             DesafioAutenticacaoRepository repository,
             DesafioAutenticacaoLockRepository lockRepository,
             MobileAuthRateLimitProperties properties,
-            MobileAuthRateLimitMetrics metrics
+            MobileAuthRateLimitMetrics metrics,
+            Clock clock
     ) {
         this.repository = repository;
         this.lockRepository = lockRepository;
         this.properties = properties;
         this.metrics = metrics;
+        this.clock = clock;
     }
 
-    public RateLimitDecision evaluate(String phoneHash, String ipHash, Instant now) {
+    public RateLimitDecision evaluate(String phoneHash, String ipHash) {
         Objects.requireNonNull(phoneHash);
         Objects.requireNonNull(ipHash);
-        Objects.requireNonNull(now);
 
         lockRepository.adquirir(lockId(RateLimitScope.PHONE, phoneHash));
         lockRepository.adquirir(lockId(RateLimitScope.IP, ipHash));
+        Instant now = clock.instant();
 
         List<Instant> phoneHistory = repository.findCriacoesRecentesPorTelefone(
                 phoneHash,
@@ -85,10 +89,11 @@ public class MobileAuthRateLimitService {
         }
 
         if (longest == null) {
-            return RateLimitDecision.permit();
+            return RateLimitDecision.permit(now);
         }
 
         RateLimitDecision decision = RateLimitDecision.blocked(
+                now,
                 longest.blockedUntil(),
                 secondsRoundedUp(Duration.between(now, longest.blockedUntil())),
                 longest.scope(),

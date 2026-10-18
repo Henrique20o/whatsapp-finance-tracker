@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.data.domain.Pageable;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +32,7 @@ class MobileAuthRateLimitServiceTest {
     private DesafioAutenticacaoRepository repository;
     private DesafioAutenticacaoLockRepository lockRepository;
     private MobileAuthRateLimitMetrics metrics;
+    private Clock clock;
     private MobileAuthRateLimitService service;
 
     @BeforeEach
@@ -38,12 +40,15 @@ class MobileAuthRateLimitServiceTest {
         repository = mock(DesafioAutenticacaoRepository.class);
         lockRepository = mock(DesafioAutenticacaoLockRepository.class);
         metrics = mock(MobileAuthRateLimitMetrics.class);
+        clock = mock(Clock.class);
+        when(clock.instant()).thenReturn(NOW);
         MobileAuthRateLimitProperties properties = new MobileAuthRateLimitProperties();
         service = new MobileAuthRateLimitService(
                 repository,
                 lockRepository,
                 properties,
-                metrics
+                metrics,
+                clock
         );
 
         when(repository.findUltimoReenvioPermitidoPorTelefone(PHONE_HASH))
@@ -57,15 +62,17 @@ class MobileAuthRateLimitServiceTest {
     }
 
     @Test
-    void devePermitirPrimeiraSolicitacaoEAdquirirLocksNaOrdem() {
-        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH, NOW);
+    void deveCapturarInstanteSomenteDepoisDeAdquirirLocks() {
+        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH);
 
         assertThat(decision.allowed()).isTrue();
-        InOrder order = inOrder(lockRepository);
+        InOrder order = inOrder(lockRepository, clock);
         order.verify(lockRepository).adquirir(
                 MobileAuthRateLimitService.lockId(RateLimitScope.PHONE, PHONE_HASH));
         order.verify(lockRepository).adquirir(
                 MobileAuthRateLimitService.lockId(RateLimitScope.IP, IP_HASH));
+        order.verify(clock).instant();
+        assertThat(decision.evaluatedAt()).isEqualTo(NOW);
         verify(metrics, never()).recordRejection(any());
     }
 
@@ -74,7 +81,7 @@ class MobileAuthRateLimitServiceTest {
         when(repository.findUltimoReenvioPermitidoPorTelefone(PHONE_HASH))
                 .thenReturn(Optional.of(NOW.plusMillis(60_001)));
 
-        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH, NOW);
+        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH);
 
         assertThat(decision.allowed()).isFalse();
         assertThat(decision.scope()).isEqualTo(RateLimitScope.PHONE);
@@ -88,7 +95,7 @@ class MobileAuthRateLimitServiceTest {
         when(repository.findUltimoReenvioPermitidoPorTelefone(PHONE_HASH))
                 .thenReturn(Optional.of(NOW));
 
-        assertThat(service.evaluate(PHONE_HASH, IP_HASH, NOW).allowed()).isTrue();
+        assertThat(service.evaluate(PHONE_HASH, IP_HASH).allowed()).isTrue();
     }
 
     @Test
@@ -97,7 +104,7 @@ class MobileAuthRateLimitServiceTest {
                 eq(PHONE_HASH), any(Instant.class), any(Pageable.class)))
                 .thenReturn(descendingHistory(5, 10));
 
-        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH, NOW);
+        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH);
 
         assertThat(decision.rule()).isEqualTo(RateLimitRule.HOURLY);
         assertThat(decision.scope()).isEqualTo(RateLimitScope.PHONE);
@@ -114,7 +121,7 @@ class MobileAuthRateLimitServiceTest {
                 eq(PHONE_HASH), any(Instant.class), any(Pageable.class)))
                 .thenReturn(history);
 
-        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH, NOW);
+        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH);
 
         assertThat(decision.rule()).isEqualTo(RateLimitRule.DAILY);
         assertThat(decision.scope()).isEqualTo(RateLimitScope.PHONE);
@@ -127,7 +134,7 @@ class MobileAuthRateLimitServiceTest {
                 eq(IP_HASH), any(Instant.class), any(Pageable.class)))
                 .thenReturn(descendingHistory(30, 30));
 
-        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH, NOW);
+        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH);
 
         assertThat(decision.rule()).isEqualTo(RateLimitRule.HOURLY);
         assertThat(decision.scope()).isEqualTo(RateLimitScope.IP);
@@ -142,7 +149,7 @@ class MobileAuthRateLimitServiceTest {
                 eq(IP_HASH), any(Instant.class), any(Pageable.class)))
                 .thenReturn(descendingHistory(30, 1));
 
-        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH, NOW);
+        RateLimitDecision decision = service.evaluate(PHONE_HASH, IP_HASH);
 
         assertThat(decision.scope()).isEqualTo(RateLimitScope.IP);
         assertThat(decision.rule()).isEqualTo(RateLimitRule.HOURLY);

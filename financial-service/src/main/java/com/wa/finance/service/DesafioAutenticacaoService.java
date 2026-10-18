@@ -10,7 +10,6 @@ import com.wa.finance.security.VerificationCodeProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -24,7 +23,6 @@ public class DesafioAutenticacaoService {
     private final DesafioAutenticacaoRepository repository;
     private final MobileAuthRateLimitService rateLimitService;
     private final VerificationCodeProperties properties;
-    private final Clock clock;
 
     public DesafioAutenticacaoService(
             PhoneProtectionService phoneProtectionService,
@@ -33,8 +31,7 @@ public class DesafioAutenticacaoService {
             ClientIpProtectionService ipProtectionService,
             DesafioAutenticacaoRepository repository,
             MobileAuthRateLimitService rateLimitService,
-            VerificationCodeProperties properties,
-            Clock clock
+            VerificationCodeProperties properties
     ) {
         this.phoneProtectionService = phoneProtectionService;
         this.codeGenerator = codeGenerator;
@@ -43,7 +40,6 @@ public class DesafioAutenticacaoService {
         this.repository = repository;
         this.rateLimitService = rateLimitService;
         this.properties = properties;
-        this.clock = clock;
     }
 
     @Transactional
@@ -52,8 +48,7 @@ public class DesafioAutenticacaoService {
         String telefoneHash = phoneProtectionService.lookupHash(telefoneNormalizado);
         String ipHash = ipProtectionService.hash(enderecoIpCanonico);
 
-        Instant agora = clock.instant();
-        RateLimitDecision rateLimit = rateLimitService.evaluate(telefoneHash, ipHash, agora);
+        RateLimitDecision rateLimit = rateLimitService.evaluate(telefoneHash, ipHash);
         if (!rateLimit.allowed()) {
             throw new RateLimitExceededException(
                     rateLimit.retryAfterSeconds(),
@@ -61,6 +56,7 @@ public class DesafioAutenticacaoService {
                     rateLimit.rule()
             );
         }
+        Instant agora = rateLimit.evaluatedAt();
         repository.invalidarNaoFinalizadosPorTelefone(telefoneHash, agora);
 
         UUID challengeId = UUID.randomUUID();
