@@ -54,6 +54,10 @@ app:
         hmac-key: ${MOBILE_AUTH_HMAC_KEY}
         ttl: ${MOBILE_VERIFICATION_CODE_TTL:5m}
         resend-interval: ${MOBILE_VERIFICATION_RESEND_INTERVAL:60s}
+        rate-limit:
+          phone-per-hour: ${MOBILE_AUTH_PHONE_PER_HOUR:5}
+          phone-per-day: ${MOBILE_AUTH_PHONE_PER_DAY:10}
+          ip-per-hour: ${MOBILE_AUTH_IP_PER_HOUR:30}
       auth-delivery:
         key: ${MOBILE_AUTH_DELIVERY_KEY}
         key-id: ${MOBILE_AUTH_DELIVERY_KEY_ID:v1}

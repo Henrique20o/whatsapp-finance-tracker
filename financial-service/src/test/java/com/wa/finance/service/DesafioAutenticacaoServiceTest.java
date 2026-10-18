@@ -1,7 +1,6 @@
 package com.wa.finance.service;
 
 import com.wa.finance.domain.DesafioAutenticacao;
-import com.wa.finance.repository.DesafioAutenticacaoLockRepository;
 import com.wa.finance.repository.DesafioAutenticacaoRepository;
 import com.wa.finance.security.ClientIpProtectionService;
 import com.wa.finance.security.PhoneProtectionService;
@@ -35,7 +34,7 @@ class DesafioAutenticacaoServiceTest {
     private VerificationCodeHasher codeHasher;
     private ClientIpProtectionService ipProtectionService;
     private DesafioAutenticacaoRepository repository;
-    private DesafioAutenticacaoLockRepository lockRepository;
+    private MobileAuthRateLimitService rateLimitService;
     private DesafioAutenticacaoService service;
 
     @BeforeEach
@@ -45,7 +44,9 @@ class DesafioAutenticacaoServiceTest {
         codeHasher = mock(VerificationCodeHasher.class);
         ipProtectionService = mock(ClientIpProtectionService.class);
         repository = mock(DesafioAutenticacaoRepository.class);
-        lockRepository = mock(DesafioAutenticacaoLockRepository.class);
+        rateLimitService = mock(MobileAuthRateLimitService.class);
+        when(rateLimitService.evaluate(any(), any(), any()))
+                .thenReturn(RateLimitDecision.permit());
 
         VerificationCodeProperties properties = new VerificationCodeProperties();
         properties.setHmacKey(Base64.getEncoder().encodeToString(new byte[32]));
@@ -58,7 +59,7 @@ class DesafioAutenticacaoServiceTest {
                 codeHasher,
                 ipProtectionService,
                 repository,
-                lockRepository,
+                rateLimitService,
                 properties,
                 Clock.fixed(AGORA, ZoneOffset.UTC)
         );
@@ -101,7 +102,7 @@ class DesafioAutenticacaoServiceTest {
     }
 
     @Test
-    void deveBloquearTelefoneAntesDeInvalidarESalvar() {
+    void deveAvaliarLimitesAntesDeInvalidarESalvar() {
         String telefoneHash = "0123456789abcdef" + "a".repeat(48);
         when(phoneProtectionService.normalize(any())).thenReturn("5531999998888");
         when(phoneProtectionService.lookupHash(any())).thenReturn(telefoneHash);
@@ -112,9 +113,37 @@ class DesafioAutenticacaoServiceTest {
 
         service.criar("5531999998888", "192.0.2.10");
 
-        InOrder order = inOrder(lockRepository, repository);
-        order.verify(lockRepository).adquirir(DesafioAutenticacaoService.lockId(telefoneHash));
+        InOrder order = inOrder(rateLimitService, repository);
+        order.verify(rateLimitService).evaluate(telefoneHash, "c".repeat(64), AGORA);
         order.verify(repository).invalidarNaoFinalizadosPorTelefone(telefoneHash, AGORA);
         order.verify(repository).save(any(DesafioAutenticacao.class));
+    }
+
+    @Test
+    void naoDeveInvalidarNemGerarCodigoQuandoLimiteForExcedido() {
+        String telefoneHash = "a".repeat(64);
+        String ipHash = "b".repeat(64);
+        when(phoneProtectionService.normalize(any())).thenReturn("5531999998888");
+        when(phoneProtectionService.lookupHash(any())).thenReturn(telefoneHash);
+        when(ipProtectionService.hash(any())).thenReturn(ipHash);
+        when(rateLimitService.evaluate(telefoneHash, ipHash, AGORA))
+                .thenReturn(RateLimitDecision.blocked(
+                        AGORA.plusSeconds(60),
+                        60,
+                        RateLimitScope.PHONE,
+                        RateLimitRule.RESEND
+                ));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service.criar("5531999998888", "192.0.2.10"))
+                .isInstanceOf(RateLimitExceededException.class)
+                .satisfies(exception -> assertThat(
+                        ((RateLimitExceededException) exception).getRetryAfterSeconds())
+                        .isEqualTo(60));
+
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.never())
+                .invalidarNaoFinalizadosPorTelefone(any(), any());
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.never()).save(any());
+        org.mockito.Mockito.verifyNoInteractions(codeGenerator, codeHasher);
     }
 }

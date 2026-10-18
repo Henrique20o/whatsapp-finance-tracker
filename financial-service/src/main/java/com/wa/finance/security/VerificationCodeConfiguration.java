@@ -8,7 +8,10 @@ import java.security.SecureRandom;
 import java.time.Clock;
 
 @Configuration
-@EnableConfigurationProperties(VerificationCodeProperties.class)
+@EnableConfigurationProperties({
+        VerificationCodeProperties.class,
+        MobileAuthRateLimitProperties.class
+})
 public class VerificationCodeConfiguration {
 
     @Bean

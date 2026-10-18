@@ -5,6 +5,9 @@ import com.wa.finance.service.SolicitacaoCodigoService;
 import com.wa.finance.service.CodigoConfirmado;
 import com.wa.finance.service.ConfirmacaoCodigoResultado;
 import com.wa.finance.service.ConfirmacaoCodigoService;
+import com.wa.finance.service.RateLimitExceededException;
+import com.wa.finance.service.RateLimitRule;
+import com.wa.finance.service.RateLimitScope;
 import com.wa.finance.web.mobile.ClientIpResolver;
 import com.wa.finance.web.mobile.MobileApiExceptionHandler;
 import com.wa.finance.web.mobile.MobileCorrelationIdFilter;
@@ -112,6 +115,36 @@ class MobileAuthControllerTest {
                 .andExpect(jsonPath("$.message").value("Não foi possível processar a solicitação agora"))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("segredo técnico")
+                )));
+    }
+
+    @Test
+    void deveResponderTooManyRequestsComTempoDeEspera() throws Exception {
+        service.falha = new RateLimitExceededException(
+                61,
+                RateLimitScope.PHONE,
+                RateLimitRule.HOURLY
+        );
+
+        mockMvc.perform(post(PATH)
+                        .with(remoteAddress("192.0.2.10"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"telefone\":\"5531999998888\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "61"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string(
+                        MobileCorrelationIdFilter.HEADER_NAME,
+                        matchesPattern(UUID_PATTERN)))
+                .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"))
+                .andExpect(jsonPath("$.message").value("Aguarde antes de tentar novamente"))
+                .andExpect(jsonPath("$.path").value(PATH))
+                .andExpect(jsonPath("$.challengeId").doesNotExist())
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("HOURLY")
+                )))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("5531999998888")
                 )));
     }
 

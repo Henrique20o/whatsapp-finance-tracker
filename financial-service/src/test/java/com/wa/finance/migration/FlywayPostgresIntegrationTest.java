@@ -8,6 +8,7 @@ import com.wa.finance.service.DesafioAutenticacaoService;
 import com.wa.finance.service.DesafioCriado;
 import com.wa.finance.service.ConfirmacaoCodigoResultado;
 import com.wa.finance.service.ConfirmacaoCodigoService;
+import com.wa.finance.service.RateLimitExceededException;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -245,7 +246,7 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
     }
 
     @Test
-    void deveSerializarCriacoesConcorrentesDoMesmoTelefone() throws Exception {
+    void deveAceitarSomenteUmaCriacaoConcorrenteDoMesmoTelefone() throws Exception {
         String telefone = "5511987654321";
         String telefoneHash = phoneProtectionService.lookupHash(telefone);
         CountDownLatch prontas = new CountDownLatch(2);
@@ -253,29 +254,41 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         try {
-            Future<DesafioCriado> first = executor.submit(
-                    () -> criarDepoisDoSinal(telefone, "192.0.2.10", prontas, iniciar)
+            Future<Object> first = executor.submit(
+                    () -> tentarCriarDepoisDoSinal(telefone, "192.0.2.10", prontas, iniciar)
             );
-            Future<DesafioCriado> second = executor.submit(
-                    () -> criarDepoisDoSinal(telefone, "192.0.2.11", prontas, iniciar)
+            Future<Object> second = executor.submit(
+                    () -> tentarCriarDepoisDoSinal(telefone, "192.0.2.11", prontas, iniciar)
             );
 
             assertThat(prontas.await(10, TimeUnit.SECONDS)).isTrue();
             iniciar.countDown();
 
-            DesafioCriado primeiroResultado = first.get(30, TimeUnit.SECONDS);
-            DesafioCriado segundoResultado = second.get(30, TimeUnit.SECONDS);
+            List<Object> resultados = List.of(
+                    first.get(30, TimeUnit.SECONDS),
+                    second.get(30, TimeUnit.SECONDS));
             List<DesafioAutenticacao> desafios = desafioRepository
                     .findAllByTelefoneHashOrderByCriadoEmAsc(telefoneHash);
 
-            assertThat(desafios).hasSize(2);
-            assertThat(desafios).filteredOn(desafio -> desafio.getInvalidadoEm() == null).hasSize(1);
-            assertThat(desafios).filteredOn(desafio -> desafio.getInvalidadoEm() != null).hasSize(1);
+            assertThat(resultados).filteredOn(DesafioCriado.class::isInstance).hasSize(1);
+            assertThat(resultados).filteredOn(RateLimitExceededException.class::isInstance).hasSize(1);
+            assertThat(resultados)
+                    .filteredOn(RateLimitExceededException.class::isInstance)
+                    .first()
+                    .satisfies(resultado -> assertThat(
+                            ((RateLimitExceededException) resultado).getRetryAfterSeconds())
+                            .isBetween(1L, 60L));
+
+            DesafioCriado resultadoAceito = (DesafioCriado) resultados.stream()
+                    .filter(DesafioCriado.class::isInstance)
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(desafios).singleElement().satisfies(desafio ->
+                    assertThat(desafio.getInvalidadoEm()).isNull());
             assertThat(desafios).allSatisfy(desafio -> {
                 assertThat(desafio.getCodigoHmac())
                         .matches("[0-9a-f]{64}")
-                        .isNotEqualTo(primeiroResultado.getCodigoParaEnvio())
-                        .isNotEqualTo(segundoResultado.getCodigoParaEnvio());
+                        .isNotEqualTo(resultadoAceito.getCodigoParaEnvio());
                 assertThat(desafio.getTelefoneCriptografado()).isNotEqualTo(telefone);
                 assertThat(phoneProtectionService.decrypt(desafio.getTelefoneCriptografado())).isEqualTo(telefone);
                 assertThat(desafio.getIpHash()).matches("[0-9a-f]{64}");
@@ -467,6 +480,48 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
                 .doesNotContain("\"codigo\"");
     }
 
+    @Test
+    void endpointDeveLimitarReenvioSemInvalidarDesafioNemDuplicarOutbox() throws Exception {
+        String telefone = "5511912345678";
+        String telefoneHash = phoneProtectionService.lookupHash(telefone);
+        String body = "{\"telefone\":\"" + telefone + "\"}";
+
+        mockMvc.perform(post("/mobile/v1/auth/codes")
+                        .with(request -> {
+                            request.setRemoteAddr("192.0.2.60");
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isAccepted());
+
+        mockMvc.perform(post("/mobile/v1/auth/codes")
+                        .with(request -> {
+                            request.setRemoteAddr("192.0.2.60");
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", matchesPattern("[1-9][0-9]*")))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"))
+                .andExpect(jsonPath("$.challengeId").doesNotExist());
+
+        List<DesafioAutenticacao> desafios = desafioRepository
+                .findAllByTelefoneHashOrderByCriadoEmAsc(telefoneHash);
+        assertThat(desafios).singleElement().satisfies(desafio -> {
+            assertThat(desafio.getInvalidadoEm()).isNull();
+            assertThat(desafio.getConsumidoEm()).isNull();
+        });
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_outbox WHERE tipo_evento = 'CODIGO_AUTENTICACAO_WHATSAPP' "
+                        + "AND payload LIKE ?",
+                Integer.class,
+                "%" + desafios.getFirst().getId() + "%"
+        )).isEqualTo(1);
+    }
+
     private List<String> tabelasDaAplicacao() {
         return jdbcTemplate.queryForList("""
                 SELECT table_name
@@ -552,7 +607,7 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
                 + UUID.randomUUID().toString().replace("-", "");
     }
 
-    private DesafioCriado criarDepoisDoSinal(
+    private Object tentarCriarDepoisDoSinal(
             String telefone,
             String ip,
             CountDownLatch prontas,
@@ -562,6 +617,10 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
         if (!iniciar.await(10, TimeUnit.SECONDS)) {
             throw new IllegalStateException("As criações concorrentes não receberam o sinal de início");
         }
-        return desafioService.criar(telefone, ip);
+        try {
+            return desafioService.criar(telefone, ip);
+        } catch (RateLimitExceededException exception) {
+            return exception;
+        }
     }
 }
