@@ -2,9 +2,8 @@ package com.wa.finance.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-
 import java.math.BigDecimal;
+import java.time.ZoneId;
 import java.time.LocalDateTime;
 
 @Entity
@@ -22,6 +21,8 @@ import java.time.LocalDateTime;
 @Builder
 public class Transacao {
 
+    public enum Origem { WHATSAPP, MOBILE }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -35,13 +36,17 @@ public class Transacao {
     @Column(nullable = false)
     private String descricao;
 
-    @CreationTimestamp
     @Column(name = "data_hora", nullable = false, updatable = false)
     private LocalDateTime dataHora;
 
     @Column(nullable = false)
     @Builder.Default
     private Boolean deletado = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "origem", nullable = false, length = 20)
+    @Builder.Default
+    private Origem origem = Origem.WHATSAPP;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
@@ -50,4 +55,9 @@ public class Transacao {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "categoria_id", nullable = false)
     private Categoria categoria;
+
+    @jakarta.persistence.PrePersist
+    void preencherDataHora() {
+        if (dataHora == null) dataHora = LocalDateTime.now(ZoneId.of("America/Sao_Paulo"));
+    }
 }

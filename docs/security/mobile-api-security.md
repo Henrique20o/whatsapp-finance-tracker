@@ -33,6 +33,8 @@ Definir regras verificáveis de autenticação, autorização, proteção de dad
 | `/mobile/v1/auth/codes/verify` | Desafio, código e limites de tentativas |
 | `/mobile/v1/auth/refresh` | Refresh token válido |
 | `/mobile/v1/auth/logout` | Refresh token; operação idempotente |
+| `/mobile/v1/auth/sessions` | JWT; lista ou encerra aparelhos do próprio usuário |
+| `/mobile/v1/me` | JWT; perfil do próprio usuário |
 | Demais `/mobile/v1/**` | Access token JWT obrigatório |
 | Rotas não previstas | Acesso negado |
 
@@ -64,6 +66,7 @@ A validação deve conferir:
 - estrutura e tipos das claims obrigatórias.
 
 A chave privada deve permanecer fora do repositório. Somente a chave pública será usada pelos componentes que apenas validam tokens.
+Tokens usam `kid` versionado para permitir rotação; a tolerância de relógio é explícita e configurada em 30 segundos por padrão.
 
 ## Refresh token e sessão
 
@@ -134,6 +137,14 @@ Os limites devem funcionar de maneira consistente quando houver mais de uma inst
 - `nomeDispositivo` é opcional e apenas informativo;
 - `nomeDispositivo` não será usado como fator de autenticação.
 
+## Retenção e observabilidade
+
+- desafios expirados são mantidos por 30 dias após a expiração para diagnóstico e então removidos em lotes;
+- refresh tokens usados ou revogados permanecem por 30 dias após o prazo absoluto da família, preservando a janela para detectar replay;
+- resultados de idempotência permanecem por 30 dias; após a limpeza, uma chave UUID pode ser usada novamente;
+- jobs registram apenas quantidades removidas, sem IDs, telefone, chave idempotente ou token;
+- métricas de autenticação usam apenas resultado e regra como dimensões de baixa cardinalidade.
+
 ## Autorização e isolamento
 
 - o proprietário dos dados vem exclusivamente do claim `sub`;
@@ -186,7 +197,9 @@ Os controles e testes devem considerar:
 - validação de assinatura, algoritmo, emissor, audiência e expiração;
 - geração e hash do refresh token;
 - rotação, expiração e revogação da sessão;
-- validação de valores, datas e períodos financeiros.
+- validação de valores, datas e períodos financeiros;
+- idempotência concorrente, autorização por usuário e isolamento de recursos;
+- comparação de relatórios com transações detalhadas do mesmo período.
 
 ### Testes de integração
 
@@ -200,7 +213,10 @@ Usar PostgreSQL real com Testcontainers para validar:
 - logout idempotente;
 - limites por telefone e IP;
 - idempotência do registro de gasto;
-- consultas filtradas pelo usuário autenticado.
+- consultas filtradas pelo usuário autenticado;
+- migrações da origem da transação, ID público e nomes normalizados de categorias;
+- ausência de confirmação WhatsApp para gasto criado pelo mobile;
+- mesma chave idempotente com payload igual/diferente e corridas concorrentes.
 
 ### Testes HTTP e de segurança
 

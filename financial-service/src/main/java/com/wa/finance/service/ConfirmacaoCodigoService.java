@@ -5,6 +5,7 @@ import com.wa.finance.domain.Usuario;
 import com.wa.finance.repository.DesafioAutenticacaoRepository;
 import com.wa.finance.security.PhoneProtectionService;
 import com.wa.finance.security.VerificationCodeHasher;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +22,25 @@ public class ConfirmacaoCodigoService {
     private final PhoneProtectionService phoneProtectionService;
     private final VerificationCodeHasher codeHasher;
     private final UsuarioService usuarioService;
+    private final MobileSessionService mobileSessionService;
     private final Clock clock;
+
+    @Autowired
+    public ConfirmacaoCodigoService(
+            DesafioAutenticacaoRepository desafioRepository,
+            PhoneProtectionService phoneProtectionService,
+            VerificationCodeHasher codeHasher,
+            UsuarioService usuarioService,
+            MobileSessionService mobileSessionService,
+            Clock clock
+    ) {
+        this.desafioRepository = desafioRepository;
+        this.phoneProtectionService = phoneProtectionService;
+        this.codeHasher = codeHasher;
+        this.usuarioService = usuarioService;
+        this.mobileSessionService = mobileSessionService;
+        this.clock = clock;
+    }
 
     public ConfirmacaoCodigoService(
             DesafioAutenticacaoRepository desafioRepository,
@@ -30,11 +49,7 @@ public class ConfirmacaoCodigoService {
             UsuarioService usuarioService,
             Clock clock
     ) {
-        this.desafioRepository = desafioRepository;
-        this.phoneProtectionService = phoneProtectionService;
-        this.codeHasher = codeHasher;
-        this.usuarioService = usuarioService;
-        this.clock = clock;
+        this(desafioRepository, phoneProtectionService, codeHasher, usuarioService, null, clock);
     }
 
     @Transactional
@@ -69,13 +84,16 @@ public class ConfirmacaoCodigoService {
         }
 
         Usuario usuario = usuarioService.buscarOuCriarUsuarioPorTelefone(telefone);
+        var tokenResponse = mobileSessionService == null
+                ? null
+                : mobileSessionService.criar(usuario.getId(), nomeDispositivo);
         desafio.consumir(agora);
         String nomeNormalizado = nomeDispositivo == null ? null : nomeDispositivo.trim();
         log.info(
                 "event=MOBILE_AUTH_VERIFY_CONFIRMED challengeId={} correlationId={} userId={}",
                 challengeId, correlationId, usuario.getId());
         return ConfirmacaoCodigoResultado.confirmado(
-                new CodigoConfirmado(usuario.getId(), nomeNormalizado));
+                new CodigoConfirmado(usuario.getId(), nomeNormalizado, tokenResponse));
     }
 
     private void registrarRejeicao(UUID challengeId, String correlationId, String categoria) {

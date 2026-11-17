@@ -8,7 +8,10 @@ import com.wa.finance.service.DesafioAutenticacaoService;
 import com.wa.finance.service.DesafioCriado;
 import com.wa.finance.service.ConfirmacaoCodigoResultado;
 import com.wa.finance.service.ConfirmacaoCodigoService;
+import com.wa.finance.service.MobileSessionService;
 import com.wa.finance.service.RateLimitExceededException;
+import com.wa.finance.service.UsuarioService;
+import com.nimbusds.jwt.SignedJWT;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +26,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 
 import java.util.List;
 import java.util.UUID;
@@ -58,6 +62,8 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
 
     private static final Pattern CHALLENGE_ID_PATTERN =
             Pattern.compile("\\\"challengeId\\\":\\\"([^\\\"]+)\\\"");
+    private static final Pattern REFRESH_TOKEN_PATTERN =
+            Pattern.compile("\\\"refreshToken\\\":\\\"([A-Za-z0-9_-]{43})\\\"");
 
     @Container
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:15-alpine")
@@ -86,6 +92,12 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
     private ConfirmacaoCodigoService confirmacaoCodigoService;
 
     @Autowired
+    private MobileSessionService mobileSessionService;
+
+    @Autowired
+    private UsuarioService usuarioService;
+
+    @Autowired
     private PhoneProtectionService phoneProtectionService;
 
     @Autowired
@@ -98,10 +110,10 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
                 Integer.class
         );
 
-        assertThat(versoes).containsExactly(1, 2, 3);
+        assertThat(versoes).containsExactly(1, 2, 3, 4, 5, 6);
         assertThat(tabelasDaAplicacao()).containsExactlyInAnyOrder(
                 "tb_usuario", "tb_categoria", "tb_transacao", "tb_outbox",
-                "tb_desafio_autenticacao", "tb_sessao_mobile"
+                "tb_desafio_autenticacao", "tb_sessao_mobile", "tb_idempotencia_mobile"
         );
 
         assertThat(tipoDaColuna("tb_desafio_autenticacao", "id")).isEqualTo("uuid");
@@ -389,14 +401,31 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
                 }
                 """.formatted(criado.getChallengeId(), criado.getCodigoParaEnvio());
 
-        mockMvc.perform(post("/mobile/v1/auth/codes/verify")
+        var confirmation = mockMvc.perform(post("/mobile/v1/auth/codes/verify")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
-                .andExpect(status().isNoContent())
+                .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(header().string("X-Correlation-Id", matchesPattern(
                         "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
-                )));
+                )))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.accessTokenExpiraEmSegundos").value(900))
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andReturn();
+
+        String responseBody = confirmation.getResponse().getContentAsString();
+        var refreshMatcher = REFRESH_TOKEN_PATTERN.matcher(responseBody);
+        assertThat(refreshMatcher.find()).isTrue();
+        String refreshToken = refreshMatcher.group(1);
+        long userId = jdbcTemplate.queryForObject("SELECT id FROM tb_usuario WHERE telefone_hash = ?",
+                Long.class, phoneProtectionService.lookupHash(telefone));
+        String persistedHash = jdbcTemplate.queryForObject(
+                "SELECT refresh_token_hash FROM tb_sessao_mobile WHERE usuario_id = ?",
+                String.class, userId).trim();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_sessao_mobile WHERE usuario_id = ?", Integer.class, userId)).isEqualTo(1);
+        assertThat(persistedHash).isNotEqualTo(refreshToken);
 
         mockMvc.perform(post("/mobile/v1/auth/codes/verify")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -404,6 +433,228 @@ class FlywayPostgresIntegrationTest extends MobileSecurityIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_OR_EXPIRED_CODE"))
                 .andExpect(jsonPath("$.message").value("O código é inválido ou expirou"));
+    }
+
+    @Test
+    void endpointMobileDeGastoEIdempotenteEIsolaProprietario() throws Exception {
+        long userId = inserirUsuario();
+        long otherUserId = inserirUsuario();
+        long categoryId = jdbcTemplate.queryForObject(
+                "INSERT INTO tb_categoria (nome, usuario_id) VALUES ('Mercado', ?) RETURNING id",
+                Long.class, userId);
+        long otherCategoryId = jdbcTemplate.queryForObject(
+                "INSERT INTO tb_categoria (nome, usuario_id) VALUES ('Outro usuário', ?) RETURNING id",
+                Long.class, otherUserId);
+        String key = UUID.randomUUID().toString();
+        String payload = """
+                {"valor":12.30,"descricao":"Compra","categoriaId":%d}
+                """.formatted(categoryId);
+        var jwt = SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(token -> token.subject(Long.toString(userId))
+                        .claim("sid", UUID.randomUUID().toString()));
+
+        mockMvc.perform(post("/mobile/v1/transacoes").with(jwt)
+                        .header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.valor").value(12.30))
+                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/mobile/v1/transacoes/")));
+
+        mockMvc.perform(post("/mobile/v1/transacoes").with(jwt)
+                        .header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isCreated());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_transacao WHERE usuario_id = ? AND origem = 'MOBILE'",
+                Integer.class, userId)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_idempotencia_mobile WHERE usuario_id = ?",
+                Integer.class, userId)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_outbox WHERE tipo_evento = 'CONFIRMACAO_WHATSAPP'",
+                Integer.class)).isZero();
+
+        mockMvc.perform(post("/mobile/v1/transacoes").with(jwt)
+                        .header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"valor\":12.30,\"descricao\":\"Compra editada\",\"categoriaId\":%d}"
+                                .formatted(categoryId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"));
+
+        mockMvc.perform(post("/mobile/v1/transacoes").with(jwt)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"valor\":5.00,\"descricao\":\"Acesso alheio\",\"categoriaId\":%d}"
+                                .formatted(otherCategoryId)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void listagemERelatorioMobileFicamNoProprietarioAutenticado() throws Exception {
+        long userId = inserirUsuario();
+        long otherUserId = inserirUsuario();
+        long categoryId = jdbcTemplate.queryForObject(
+                "INSERT INTO tb_categoria (nome, usuario_id) VALUES ('Teste relatório', ?) RETURNING id",
+                Long.class, userId);
+        String token = UUID.randomUUID().toString();
+        var jwt = SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(value -> value.subject(Long.toString(userId)).claim("sid", token));
+        mockMvc.perform(post("/mobile/v1/transacoes").with(jwt)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"valor\":7.25,\"descricao\":\"Teste\",\"categoriaId\":%d}"
+                                .formatted(categoryId)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/mobile/v1/transacoes?dataInicio=2026-11-17&dataFim=2026-11-17")
+                        .with(jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens.length()").value(1))
+                .andExpect(jsonPath("$.itens[0].categoria.id").value(categoryId));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/mobile/v1/relatorios/resumo?dataInicio=2026-11-17&dataFim=2026-11-17")
+                        .with(jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(7.25))
+                .andExpect(jsonPath("$.categorias[0].categoriaId").value(categoryId));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/mobile/v1/relatorios/por-periodo?dataInicio=2026-11-17&dataFim=2026-11-19")
+                        .with(jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pontos.length()").value(3))
+                .andExpect(jsonPath("$.pontos[0].data").value("2026-11-17"))
+                .andExpect(jsonPath("$.pontos[0].total").value(7.25))
+                .andExpect(jsonPath("$.pontos[1].total").value(0))
+                .andExpect(jsonPath("$.pontos[2].quantidadeGastos").value(0));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_transacao WHERE usuario_id = ?", Integer.class, otherUserId)).isZero();
+    }
+
+    @Test
+    void operacoesMobileDeCategoriaRespeitamProprietarioEProtegemOutros() throws Exception {
+        long userId = inserirUsuario();
+        long otherUserId = inserirUsuario();
+        long otherCategoryId = jdbcTemplate.queryForObject(
+                "INSERT INTO tb_categoria (nome, usuario_id) VALUES ('Privada', ?) RETURNING id",
+                Long.class, otherUserId);
+        long systemCategoryId = jdbcTemplate.queryForObject(
+                "INSERT INTO tb_categoria (nome, usuario_id, sistema) VALUES ('Outros', ?, true) RETURNING id",
+                Long.class, userId);
+        var jwt = SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(value -> value.subject(Long.toString(userId)).claim("sid", UUID.randomUUID().toString()));
+
+        mockMvc.perform(post("/mobile/v1/categorias").with(jwt)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"nome\":\"  Mercado   local \"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.nome").value("Mercado local"));
+        long categoryId = jdbcTemplate.queryForObject(
+                "SELECT id FROM tb_categoria WHERE usuario_id = ? AND nome = 'Mercado local'",
+                Long.class, userId);
+
+        mockMvc.perform(post("/mobile/v1/categorias").with(jwt)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"nome\":\"Mercado local\"}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                        "/mobile/v1/categorias/" + categoryId).with(jwt)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"nome\":\"Feira\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("Feira"));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                        "/mobile/v1/categorias/" + otherCategoryId).with(jwt)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"nome\":\"Tomada\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/mobile/v1/categorias/" + systemCategoryId).with(jwt))
+                .andExpect(status().isUnprocessableEntity());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/mobile/v1/categorias/" + otherCategoryId).with(jwt))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/mobile/v1/categorias/" + categoryId).with(jwt))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/mobile/v1/categorias").with(jwt)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"nome\":\"Feira\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(categoryId))
+                .andExpect(jsonPath("$.ativa").value(true));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/mobile/v1/categorias").with(jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens[?(@.nome == 'Feira')] ").exists())
+                .andExpect(jsonPath("$.itens[?(@.nome == 'Privada')] ").doesNotExist());
+    }
+
+    @Test
+    void perfilMobileMascaraTelefoneEUsaIdentidadeDoJwt() throws Exception {
+        var user = usuarioService.buscarOuCriarUsuarioPorTelefone("5511998877665");
+        jdbcTemplate.update("UPDATE tb_usuario SET nome = ?, email = ? WHERE id = ?",
+                "Henrique", "henrique@example.test", user.getId());
+        long otherUserId = inserirUsuario();
+        var jwt = SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(value -> value.subject(Long.toString(user.getId())).claim("sid", UUID.randomUUID().toString()));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/mobile/v1/me").with(jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.usuarioId").isNotEmpty())
+                .andExpect(jsonPath("$.nome").value("Henrique"))
+                .andExpect(jsonPath("$.email").value("henrique@example.test"))
+                .andExpect(jsonPath("$.telefoneMascarado").value("••••••••7665"))
+                .andExpect(jsonPath("$.telefoneMascarado").value(org.hamcrest.Matchers.not("5511998877665")))
+                .andExpect(jsonPath("$.id").doesNotExist())
+                .andExpect(jsonPath("$.telefoneCriptografado").doesNotExist());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_usuario WHERE id = ?", Integer.class, otherUserId)).isEqualTo(1);
+    }
+
+    @Test
+    void gerenciamentoDeSessoesIsolaUsuarioERevogaFamilias() throws Exception {
+        long userId = inserirUsuario();
+        long otherUserId = inserirUsuario();
+        var currentTokens = mobileSessionService.criar(userId, "Meu telefone");
+        var secondTokens = mobileSessionService.criar(userId, "Tablet");
+        var otherTokens = mobileSessionService.criar(otherUserId, "Outro usuário");
+        UUID currentSession = UUID.fromString(SignedJWT.parse(currentTokens.accessToken())
+                .getJWTClaimsSet().getStringClaim("sid"));
+        UUID secondSession = UUID.fromString(SignedJWT.parse(secondTokens.accessToken())
+                .getJWTClaimsSet().getStringClaim("sid"));
+        UUID otherSession = UUID.fromString(SignedJWT.parse(otherTokens.accessToken())
+                .getJWTClaimsSet().getStringClaim("sid"));
+        var jwt = SecurityMockMvcRequestPostProcessors.jwt().jwt(value -> value
+                .subject(Long.toString(userId)).claim("sid", currentSession.toString()));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/mobile/v1/auth/sessions").with(jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens.length()").value(2))
+                .andExpect(jsonPath("$.itens[?(@.atual == true)]").exists())
+                .andExpect(header().string("Cache-Control", "no-store"));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/mobile/v1/auth/sessions/" + secondSession).with(jwt))
+                .andExpect(status().isNoContent());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_sessao_mobile WHERE sessao_id = ? AND revogado_em IS NOT NULL",
+                Integer.class, secondSession)).isEqualTo(1);
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/mobile/v1/auth/sessions/" + otherSession).with(jwt))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/mobile/v1/auth/refresh").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + secondTokens.refreshToken() + "\"}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/mobile/v1/auth/sessions").with(jwt))
+                .andExpect(status().isNoContent());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_sessao_mobile WHERE usuario_id = ? AND revogado_em IS NULL",
+                Integer.class, userId)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_sessao_mobile WHERE sessao_id = ? AND revogado_em IS NULL",
+                Integer.class, otherSession)).isEqualTo(1);
     }
 
     @Test

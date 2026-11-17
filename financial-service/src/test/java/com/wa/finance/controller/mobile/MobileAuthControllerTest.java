@@ -2,6 +2,7 @@ package com.wa.finance.controller.mobile;
 
 import com.wa.finance.service.SolicitacaoCodigoCriada;
 import com.wa.finance.service.SolicitacaoCodigoService;
+import com.wa.finance.dto.mobile.auth.TokenResponse;
 import com.wa.finance.service.CodigoConfirmado;
 import com.wa.finance.service.ConfirmacaoCodigoResultado;
 import com.wa.finance.service.ConfirmacaoCodigoService;
@@ -152,7 +153,8 @@ class MobileAuthControllerTest {
     void deveConfirmarCodigoComRespostaSemConteudoESemCache() throws Exception {
         UUID challengeId = UUID.randomUUID();
         confirmacaoService.resultado = ConfirmacaoCodigoResultado.confirmado(
-                new CodigoConfirmado(42L, "Galaxy S24"));
+                new CodigoConfirmado(42L, "Galaxy S24",
+                        new TokenResponse("jwt-access", "Bearer", 900, "opaque-refresh", 2592000)));
 
         mockMvc.perform(post(VERIFY_PATH)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -163,10 +165,14 @@ class MobileAuthControllerTest {
                                   "nomeDispositivo":"Galaxy S24"
                                 }
                                 """.formatted(challengeId)))
-                .andExpect(status().isNoContent())
+                .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(header().string(MobileCorrelationIdFilter.HEADER_NAME, matchesPattern(UUID_PATTERN)))
-                .andExpect(content().string(""));
+                .andExpect(jsonPath("$.accessToken").value("jwt-access"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.accessTokenExpiraEmSegundos").value(900))
+                .andExpect(jsonPath("$.refreshToken").value("opaque-refresh"))
+                .andExpect(jsonPath("$.refreshTokenExpiraEmSegundos").value(2592000));
 
         org.assertj.core.api.Assertions.assertThat(confirmacaoService.challengeId).isEqualTo(challengeId);
         org.assertj.core.api.Assertions.assertThat(confirmacaoService.codigo).isEqualTo("482913");

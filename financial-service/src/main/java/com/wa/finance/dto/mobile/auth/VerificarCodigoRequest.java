@@ -12,7 +12,7 @@ public record VerificarCodigoRequest(
         @NotNull
         @Pattern(regexp = "^[0-9]{6}$")
         String codigo,
-        @Size(min = 1, max = 100)
+        @Size(min = 1, max = 120)
         @Pattern(regexp = "^[^\\p{Cntrl}]*\\S[^\\p{Cntrl}]*$")
         String nomeDispositivo
 ) {

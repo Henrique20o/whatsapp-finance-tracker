@@ -36,6 +36,7 @@ public class MobileCorrelationIdFilter extends OncePerRequestFilter {
         String correlationId = UUID.randomUUID().toString();
         request.setAttribute(REQUEST_ATTRIBUTE, correlationId);
         response.setHeader(HEADER_NAME, correlationId);
+        response.setHeader("Cache-Control", "no-store");
         MDC.put(MDC_KEY, correlationId);
         try {
             filterChain.doFilter(request, response);

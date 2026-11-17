@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "tb_usuario")
@@ -34,7 +35,15 @@ public class Usuario {
     @Column(name = "telefone_hash", length = 64, unique = true)
     private String telefoneHash;
 
+    @Column(name = "mobile_public_id", nullable = false, unique = true, updatable = false)
+    private UUID mobilePublicId;
+
     @CreationTimestamp
     @Column(name = "data_cadastro", nullable = false, updatable = false)
     private LocalDateTime dataCadastro;
+
+    @PrePersist
+    void inicializarIdPublicoMobile() {
+        if (mobilePublicId == null) mobilePublicId = UUID.randomUUID();
+    }
 }

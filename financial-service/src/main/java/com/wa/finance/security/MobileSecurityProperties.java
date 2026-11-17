@@ -9,6 +9,8 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
 import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Validated
 @ConfigurationProperties(prefix = "app.security.mobile")
@@ -24,6 +26,9 @@ public class MobileSecurityProperties {
     private Duration accessTokenTtl;
 
     @NotNull
+    private Duration jwtClockSkew = Duration.ofSeconds(30);
+
+    @NotNull
     private Duration refreshTokenInactivity;
 
     @NotNull
@@ -35,9 +40,18 @@ public class MobileSecurityProperties {
     @NotNull
     private Resource publicKey;
 
+    private String activeKeyId = "v1";
+
+    private Map<String, Resource> publicKeys = new LinkedHashMap<>();
+
     @AssertTrue(message = "access-token-ttl deve ser maior que zero")
     public boolean isAccessTokenTtlValid() {
         return accessTokenTtl == null || accessTokenTtl.isPositive();
+    }
+
+    @AssertTrue(message = "active-key-id deve ter entre 1 e 64 caracteres seguros")
+    public boolean isActiveKeyIdValid() {
+        return activeKeyId == null || activeKeyId.matches("[A-Za-z0-9._-]{1,64}");
     }
 
     @AssertTrue(message = "issuer deve ser uma URI HTTPS absoluta")
@@ -89,6 +103,10 @@ public class MobileSecurityProperties {
         this.accessTokenTtl = accessTokenTtl;
     }
 
+    public Duration getJwtClockSkew() { return jwtClockSkew; }
+
+    public void setJwtClockSkew(Duration jwtClockSkew) { this.jwtClockSkew = jwtClockSkew; }
+
     public Duration getRefreshTokenInactivity() {
         return refreshTokenInactivity;
     }
@@ -119,5 +137,21 @@ public class MobileSecurityProperties {
 
     public void setPublicKey(Resource publicKey) {
         this.publicKey = publicKey;
+    }
+
+    public String getActiveKeyId() {
+        return activeKeyId;
+    }
+
+    public void setActiveKeyId(String activeKeyId) {
+        this.activeKeyId = activeKeyId;
+    }
+
+    public Map<String, Resource> getPublicKeys() {
+        return publicKeys;
+    }
+
+    public void setPublicKeys(Map<String, Resource> publicKeys) {
+        this.publicKeys = publicKeys == null ? new LinkedHashMap<>() : new LinkedHashMap<>(publicKeys);
     }
 }

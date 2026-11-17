@@ -66,6 +66,7 @@ public class UsuarioService {
                     .nome(nome)
                     .usuario(usuario)
                     .ativa(true)
+                    .sistema("Outros".equals(nome))
                     .build();
             categoriaRepository.save(categoria);
         });

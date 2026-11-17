@@ -21,6 +21,7 @@ public final class MobileJwtTestKeySupport {
     public static void registerProperties(DynamicPropertyRegistry registry) {
         registry.add("app.security.mobile.private-key", () -> resourceLocation(KEYS.privateKey()));
         registry.add("app.security.mobile.public-key", () -> resourceLocation(KEYS.publicKey()));
+        registry.add("app.security.mobile.public-keys.v1", () -> resourceLocation(KEYS.publicKey()));
     }
 
     public static TestKeyResources keys() {

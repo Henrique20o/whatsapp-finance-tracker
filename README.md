@@ -39,6 +39,8 @@ Este projeto está em desenvolvimento e tem como objetivo explorar microsserviç
 
 ## Arquitetura
 
+O desenho e o plano de implementação da API para o aplicativo estão no [SDD da API mobile](docs/mobile/mobile-api-sdd.md). O [contrato OpenAPI](docs/openapi/mobile-api.yml) define as rotas públicas planejadas.
+
 O projeto utiliza três microsserviços Spring Boot:
 
 - **`whatsapp-service`**: recebe webhooks e envia respostas por meio do WuzAPI.

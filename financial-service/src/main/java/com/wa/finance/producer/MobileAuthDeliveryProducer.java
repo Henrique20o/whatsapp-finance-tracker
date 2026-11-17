@@ -46,7 +46,7 @@ public class MobileAuthDeliveryProducer {
         try {
             CorrelationData.Confirm confirm = correlationData.getFuture()
                     .get(CONFIRM_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            if (!confirm.isAck()) {
+            if (!confirm.ack()) {
                 throw new MobileAuthPublishException("BROKER_NACK");
             }
             if (correlationData.getReturned() != null) {

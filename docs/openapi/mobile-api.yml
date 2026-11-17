@@ -196,8 +196,79 @@ paths:
       responses:
         '204':
           description: Sessão encerrada ou já inativa
+          headers:
+            Cache-Control:
+              schema: { type: string, example: no-store }
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  /mobile/v1/auth/sessions:
+    get:
+      tags: [Autenticação]
+      summary: Listar aparelhos autenticados
+      operationId: listarSessoesMobile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sessões próprias, sem tokens ou hashes
+          headers:
+            Cache-Control:
+              schema: { type: string, example: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessoesMobileResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Autenticação]
+      summary: Encerrar todos os aparelhos
+      operationId: revogarTodasSessoesMobile
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Todas as sessões foram encerradas
+          headers:
+            Cache-Control:
+              schema: { type: string, example: no-store }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /mobile/v1/auth/sessions/{id}:
+    delete:
+      tags: [Autenticação]
+      summary: Encerrar um aparelho
+      operationId: revogarSessaoMobile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Sessão encerrada ou já inativa
+          headers:
+            Cache-Control:
+              schema: { type: string, example: no-store }
+        '404': { description: Sessão não encontrada para este usuário }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /mobile/v1/me:
+    get:
+      tags: [Perfil]
+      summary: Consultar perfil do usuário autenticado
+      operationId: obterMeuPerfil
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Perfil com telefone mascarado; preferências ainda não são usadas pelo app
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PerfilMobileResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /mobile/v1/categorias:
     get:
@@ -223,6 +294,72 @@ paths:
                     nome: Alimentação
         '401':
           $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Categorias]
+      summary: Criar ou reativar categoria
+      operationId: criarCategoriaMobile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoriaMobileRequest' }
+      responses:
+        '201':
+          description: Nova categoria criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoriaMobileDetalheResponse' }
+        '200':
+          description: Categoria inativa reativada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoriaMobileDetalheResponse' }
+        '409': { description: Nome já utilizado }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /mobile/v1/categorias/{id}:
+    patch:
+      tags: [Categorias]
+      summary: Renomear categoria
+      operationId: renomearCategoriaMobile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoriaMobileRequest' }
+      responses:
+        '200':
+          description: Categoria atualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoriaMobileDetalheResponse' }
+        '404': { description: Categoria não encontrada para este usuário }
+        '409': { description: Nome já utilizado }
+        '422': { description: Categoria padrão não pode ser renomeada }
+    delete:
+      tags: [Categorias]
+      summary: Desativar categoria
+      operationId: desativarCategoriaMobile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      responses:
+        '204': { description: Categoria desativada sem apagar gastos antigos }
+        '404': { description: Categoria não encontrada para este usuário }
+        '422': { description: Categoria padrão não pode ser desativada }
 
   /mobile/v1/transacoes:
     get:
@@ -367,6 +504,32 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /mobile/v1/relatorios/por-periodo:
+    get:
+      tags: [Relatórios]
+      summary: Consultar gastos diários no período
+      description: Devolve um ponto por dia civil em America/Sao_Paulo, preenchendo dias sem gastos com zero.
+      operationId: obterRelatorioDiarioMobile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: dataInicio
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: dataFim
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Série diária do período
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RelatorioPorPeriodoMobileResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -487,7 +650,7 @@ components:
         nomeDispositivo:
           type: string
           minLength: 1
-          maxLength: 100
+          maxLength: 120
           description: Campo opcional e apenas informativo; não comprova a identidade do aparelho.
           example: Samsung Galaxy S24
 
@@ -499,10 +662,12 @@ components:
       properties:
         refreshToken:
           type: string
-          minLength: 32
+          minLength: 43
+          maxLength: 43
+          pattern: '^[A-Za-z0-9_-]{43}$'
           writeOnly: true
           description: Token opaco armazenado de forma segura pelo aplicativo.
-          example: token-opaco-nao-real-com-valor-aleatorio
+          example: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
     TokenResponse:
       type: object
@@ -530,11 +695,80 @@ components:
           type: string
           readOnly: true
           description: Refresh token opaco. A resposta seguinte à renovação contém um novo valor.
-          example: novo-token-opaco-nao-real-com-valor-aleatorio
+          example: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
         refreshTokenExpiraEmSegundos:
           type: integer
           minimum: 1
           example: 2592000
+
+    SessoesMobileResponse:
+      type: object
+      additionalProperties: false
+      required: [itens]
+      properties:
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/SessaoMobileResponse' }
+
+    SessaoMobileResponse:
+      type: object
+      additionalProperties: false
+      required: [id, nomeDispositivo, criadaEm, ultimoUsoEm, expiraEm, ativa, atual]
+      properties:
+        id: { type: string, format: uuid }
+        nomeDispositivo: { type: [string, 'null'], maxLength: 120 }
+        criadaEm: { type: string, format: date-time }
+        ultimoUsoEm: { type: string, format: date-time }
+        expiraEm: { type: string, format: date-time }
+        ativa: { type: boolean }
+        atual: { type: boolean }
+
+    PerfilMobileResponse:
+      type: object
+      additionalProperties: false
+      required: [usuarioId, nome, email, telefoneMascarado, cadastradoEm]
+      properties:
+        usuarioId: { type: string, format: uuid }
+        nome: { type: [string, 'null'], maxLength: 100 }
+        email: { type: [string, 'null'], maxLength: 100 }
+        telefoneMascarado: { type: string, minLength: 4, maxLength: 20 }
+        cadastradoEm: { type: [string, 'null'], format: date-time }
+
+    CategoriaMobileRequest:
+      type: object
+      additionalProperties: false
+      required: [nome]
+      properties:
+        nome: { type: string, minLength: 1, maxLength: 50 }
+
+    CategoriaMobileDetalheResponse:
+      type: object
+      additionalProperties: false
+      required: [id, nome, ativa]
+      properties:
+        id: { type: integer, format: int64, minimum: 1 }
+        nome: { type: string, minLength: 1, maxLength: 50 }
+        ativa: { type: boolean }
+
+    RelatorioPorPeriodoMobileResponse:
+      type: object
+      additionalProperties: false
+      required: [dataInicio, dataFim, pontos]
+      properties:
+        dataInicio: { type: string, format: date }
+        dataFim: { type: string, format: date }
+        pontos:
+          type: array
+          items: { $ref: '#/components/schemas/PontoRelatorioMobile' }
+
+    PontoRelatorioMobile:
+      type: object
+      additionalProperties: false
+      required: [data, total, quantidadeGastos]
+      properties:
+        data: { type: string, format: date }
+        total: { type: number, multipleOf: 0.01, minimum: 0 }
+        quantidadeGastos: { type: integer, minimum: 0 }
 
     CategoriaResponse:
       type: object

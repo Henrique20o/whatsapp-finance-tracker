@@ -23,6 +23,10 @@ public class Categoria {
     @Builder.Default
     private Boolean ativa = true;
 
+    @Column(name = "sistema", nullable = false)
+    @Builder.Default
+    private Boolean sistema = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuario;

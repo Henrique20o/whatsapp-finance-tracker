@@ -63,6 +63,7 @@ public class TransacaoService {
         transacao.setDescricao(dto.descricao().trim());
         transacao.setCategoria(categoria);
         transacao.setUsuario(usuario);
+        transacao.setOrigem(Transacao.Origem.WHATSAPP);
 
         transacaoRepository.saveAndFlush(transacao);
 

@@ -39,6 +39,21 @@ final class JwtKeyLoader {
         }
     }
 
+    static RSAPublicKey loadPublic(Resource publicKeyResource) {
+        try {
+            var keyFactory = KeyFactory.getInstance("RSA");
+            var publicKey = (RSAPublicKey) keyFactory.generatePublic(
+                    new X509EncodedKeySpec(readPem(publicKeyResource, "PUBLIC KEY"))
+            );
+            if (publicKey.getModulus().bitLength() < MINIMUM_RSA_BITS) {
+                throw new IllegalStateException("As chaves RSA do JWT mobile devem possuir ao menos 2048 bits");
+            }
+            return publicKey;
+        } catch (IOException | GeneralSecurityException | ClassCastException exception) {
+            throw new IllegalStateException("Não foi possível carregar a chave pública RSA do JWT mobile", exception);
+        }
+    }
+
     private static byte[] readPem(Resource resource, String type) throws IOException {
         if (resource == null || !resource.exists() || !resource.isReadable()) {
             throw new IllegalStateException("Chave JWT mobile ausente ou não legível: " + resource);

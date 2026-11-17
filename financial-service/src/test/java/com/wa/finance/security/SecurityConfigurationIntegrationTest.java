@@ -15,7 +15,6 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
@@ -72,16 +71,19 @@ class SecurityConfigurationIntegrationTest extends MobileSecurityIntegrationTest
 
     @Test
     void deveLiberarSomentePostNasRotasPublicasDeAutenticacao() throws Exception {
-        List<String> publicPaths = List.of(
-                "/mobile/v1/auth/refresh",
-                "/mobile/v1/auth/logout"
-        );
+        String unknownRefreshToken = "A".repeat(43);
+        mockMvc.perform(post("/mobile/v1/auth/refresh")
+                        .contentType("application/json")
+                        .content("{\"refreshToken\":\"" + unknownRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"))
+                .andExpect(cookie().doesNotExist("JSESSIONID"));
 
-        for (String path : publicPaths) {
-            mockMvc.perform(post(path))
-                    .andExpect(status().isNoContent())
-                    .andExpect(cookie().doesNotExist("JSESSIONID"));
-        }
+        mockMvc.perform(post("/mobile/v1/auth/logout")
+                        .contentType("application/json")
+                        .content("{\"refreshToken\":\"" + unknownRefreshToken + "\"}"))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().doesNotExist("JSESSIONID"));
 
         mockMvc.perform(post("/mobile/v1/auth/codes")
                         .contentType("application/json")
@@ -206,9 +208,11 @@ class SecurityConfigurationIntegrationTest extends MobileSecurityIntegrationTest
         var claims = JwtClaimsSet.builder()
                 .issuer("https://api.whatsapp-finance-tracker.local")
                 .audience(List.of("finance-tracker-mobile"))
-                .subject("usuario-123")
+                .subject("123")
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
+                .id(java.util.UUID.randomUUID().toString())
+                .claim("sid", java.util.UUID.randomUUID().toString())
                 .build();
         return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
     }
@@ -236,14 +240,6 @@ class SecurityConfigurationIntegrationTest extends MobileSecurityIntegrationTest
 
         @GetMapping(INTERNAL_PROBE)
         ResponseEntity<Void> internalProtected() {
-            return ResponseEntity.noContent().build();
-        }
-
-        @PostMapping({
-                "/mobile/v1/auth/refresh",
-                "/mobile/v1/auth/logout"
-        })
-        ResponseEntity<Void> publicAuthenticationRoute() {
             return ResponseEntity.noContent().build();
         }
 

@@ -46,10 +46,14 @@ app:
       issuer: ${MOBILE_JWT_ISSUER:https://api.whatsapp-finance-tracker.local}
       audience: ${MOBILE_JWT_AUDIENCE:finance-tracker-mobile}
       access-token-ttl: ${MOBILE_JWT_ACCESS_TOKEN_TTL:15m}
+      jwt-clock-skew: ${MOBILE_JWT_CLOCK_SKEW:30s}
       refresh-token-inactivity: ${MOBILE_REFRESH_TOKEN_INACTIVITY:30d}
       session-absolute-ttl: ${MOBILE_SESSION_ABSOLUTE_TTL:90d}
       private-key: ${MOBILE_JWT_PRIVATE_KEY}
       public-key: ${MOBILE_JWT_PUBLIC_KEY}
+      active-key-id: ${MOBILE_JWT_ACTIVE_KID:v1}
+      public-keys:
+        v1: ${MOBILE_JWT_V1_PUBLIC_KEY:${MOBILE_JWT_PUBLIC_KEY}}
       verification-code:
         hmac-key: ${MOBILE_AUTH_HMAC_KEY}
         ttl: ${MOBILE_VERIFICATION_CODE_TTL:5m}
